@@ -66,6 +66,15 @@ const PURCHASE_CONTRACT_TABLE_ID = "tblzaz7hDLRRPVeEz";
 const FACTORY_TABLE_ID = "tblOCrtTa8WPxPDja";
 const PURCHASE_CONTRACT_FIELD_IDS = ["fld0NoOFG9iFNVjQD"];
 const FACTORY_FIELD_IDS = ["fld6OzLLUSc1DwQt5", "fldEQlpy2q1X8C8sP"];
+const ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID = "fldyNqVj5H4OqCO5R";
+const ITEM_VENTA_INCOTERM_VENTA_FIELD_ID = "fldAt7JJ6l2Af6rCf";
+const CONFIRMATION_ITEM_VENTA_FIELD_IDS = [
+  ...new Set([
+    ...ITEM_VENTA_FIELD_IDS,
+    ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID,
+    ITEM_VENTA_INCOTERM_VENTA_FIELD_ID
+  ])
+];
 
 const CONTRACT_LINKED_TABLES = {
   incoterms: {
@@ -107,7 +116,7 @@ export async function loadConfirmationFromAirtable({ config, recordId }) {
   const saleItemRecords = await client.listRecordsByIds(
     tables.saleItems,
     saleItemIds,
-    ITEM_VENTA_FIELD_IDS
+    CONFIRMATION_ITEM_VENTA_FIELD_IDS
   );
 
   const purchaseItemIds = saleItemRecords.flatMap((record) =>
@@ -161,6 +170,9 @@ function normalizeConfirmation({
     purchaseItemRecords.map((purchaseItem) => [purchaseItem.id, purchaseItem])
   );
   const existencesBySaleItemId = groupExistencesBySaleItem(existenceRecords);
+  const contractDeliveryTerms = normalizeDeliveryTerm(
+    linkedText(fields[CONTRATO_VENTA.INCOTERM], linkedNames.incoterms)
+  );
 
   const items = saleItemRecords
     .map((saleItemRecord) =>
@@ -169,7 +181,8 @@ function normalizeConfirmation({
         purchaseItemsById,
         purchaseOriginByPurchaseItemId,
         existenceRecords: existencesBySaleItemId.get(saleItemRecord.id) || [],
-        linkedNames
+        linkedNames,
+        contractDeliveryTerms
       })
     )
     .sort(compareItemNumber);
@@ -192,9 +205,7 @@ function normalizeConfirmation({
     orderNumber: firstText(fields[CONTRATO_VENTA.NUMERO_PEDIDO]),
     date: dateValue(fields[CONTRATO_VENTA.FECHA]),
     currency: firstText(fields[CONTRATO_VENTA.MONEDA]) || "EUR",
-    deliveryTerms: normalizeDeliveryTerm(
-      linkedText(fields[CONTRATO_VENTA.INCOTERM], linkedNames.incoterms)
-    ),
+    deliveryTerms: contractDeliveryTerms,
     paymentTerms: firstLinkedText(
       fields[CONTRATO_VENTA.TERMINOS_PAGO],
       linkedNames.paymentTerms
@@ -226,7 +237,8 @@ function normalizeSaleItem({
   purchaseItemsById,
   purchaseOriginByPurchaseItemId,
   existenceRecords,
-  linkedNames
+  linkedNames,
+  contractDeliveryTerms
 }) {
   const fields = fieldsOf(saleItemRecord);
   const purchaseItemIds = recordIds(fields[ITEM_VENTA.ITEM_COMPRA]);
@@ -271,6 +283,12 @@ function normalizeSaleItem({
     linkedNames.materialTypes
   );
   const coilMinMax = summarizeCoilWeights(purchaseRecords);
+  const deliveryPlace = firstText(fields[ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID]);
+  const itemDeliveryTerms = deliveryTermsWithPlace(
+    normalizeDeliveryTerm(firstText(fields[ITEM_VENTA_INCOTERM_VENTA_FIELD_ID])) ||
+      contractDeliveryTerms,
+    deliveryPlace
+  );
   const specification = buildSpecification({
     material: linkedText(primaryPurchaseFields[ITEM_COMPRA.MATERIAL], linkedNames.materials),
     quality: linkedText(primaryPurchaseFields[ITEM_COMPRA.CALIDAD], linkedNames.qualities),
@@ -286,6 +304,8 @@ function normalizeSaleItem({
     name: firstText(fields[ITEM_VENTA.ITEM]),
     purchaseItemId,
     purchaseItemName: firstText(primaryPurchaseFields[ITEM_COMPRA.ITEM]),
+    deliveryPlace,
+    deliveryTerms: itemDeliveryTerms,
     origin: dedupe(
       purchaseItemIds
         .map((id) => purchaseOriginByPurchaseItemId.get(id))
@@ -456,6 +476,8 @@ export function getConfirmationLines(confirmation, mode) {
             itemNumber: item.number,
             specification: item.specification,
             origin: item.origin,
+            deliveryPlace: item.deliveryPlace,
+            deliveryTerms: item.deliveryTerms,
             factoryId: "",
             minNet: item.minNet,
             maxNet: item.maxNet,
@@ -469,6 +491,8 @@ export function getConfirmationLines(confirmation, mode) {
         itemNumber: item.number,
         specification: item.specification || existence.specification,
         origin: item.origin,
+        deliveryPlace: item.deliveryPlace,
+        deliveryTerms: item.deliveryTerms,
         factoryId: existence.factoryId,
         minNet: item.minNet,
         maxNet: item.maxNet,
@@ -483,6 +507,8 @@ export function getConfirmationLines(confirmation, mode) {
     itemNumber: item.number,
     specification: item.specification,
     origin: item.origin,
+    deliveryPlace: item.deliveryPlace,
+    deliveryTerms: item.deliveryTerms,
     units: item.sheetUnits,
     minNet: item.minNet,
     maxNet: item.maxNet,
@@ -568,6 +594,18 @@ function normalizeDeliveryTerm(value) {
     /\b(?:EXW|FCA|FAS|FOB|CFR|CIF|CPT|CIP|DAP|DAT|DPU|DDP)\b/i
   );
   return match ? match[0].toUpperCase() : raw;
+}
+
+function deliveryTermsWithPlace(deliveryTerms, deliveryPlace) {
+  const normalizedTerms = String(deliveryTerms || "").trim();
+  const normalizedPlace = String(deliveryPlace || "").trim();
+  if (!normalizedTerms || !normalizedPlace) return normalizedTerms;
+
+  const placeForMatch = normalizeText(normalizedPlace);
+  const termsForMatch = normalizeText(normalizedTerms);
+  if (termsForMatch.endsWith(placeForMatch)) return normalizedTerms;
+
+  return `${normalizedTerms} ${normalizedPlace}`;
 }
 
 function dedupe(values) {

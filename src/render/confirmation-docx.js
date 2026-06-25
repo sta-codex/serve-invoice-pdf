@@ -6,7 +6,6 @@ import { getConfirmationLines } from "../services/confirmation-service.js";
 const TEMPLATE_URL = new URL("../templates/confirmacion-pedido.docx", import.meta.url);
 const VAT_RATE = 0.21;
 const TABLE_WIDTHS = [650, 2350, 950, 1200, 1100, 1100, 1300, 1200];
-const SHEET_TABLE_WIDTHS = TABLE_WIDTHS.slice(0, 7);
 const STA_HEADER_LEFT_MARGIN_REDUCTION_DXA = 432;
 const LABEL_VALUE_PREFIXES = [
   "origen",
@@ -27,9 +26,17 @@ const RECLAMACIONES_TEXT =
 export async function renderConfirmationDocx(confirmation, { mode }) {
   const zip = await JSZip.loadAsync(readFileSync(TEMPLATE_URL));
   const hasMultipleOrigins = getOriginCount(confirmation) > 1;
+  const hasMultipleDeliveryTerms = getDeliveryTermCount(confirmation) > 1;
   const origin = getSingleOrigin(confirmation);
-  const replacements = buildReplacements(confirmation, { mode, hasMultipleOrigins });
-  const merchandiseTable = buildMerchandiseTableXml(confirmation, mode, hasMultipleOrigins);
+  const replacements = buildReplacements(confirmation, {
+    mode,
+    hasMultipleOrigins,
+    hasMultipleDeliveryTerms
+  });
+  const merchandiseTable = buildMerchandiseTableXml(confirmation, mode, {
+    hasMultipleOrigins,
+    hasMultipleDeliveryTerms
+  });
   await Promise.all(
     Object.keys(zip.files)
       .filter((name) => /^word\/.*\.xml$/.test(name))
@@ -54,7 +61,10 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
           } else {
             xml = replaceOriginLine(xml, `ORIGEN: ${origin}`);
           }
-          xml = updateStorageLine(xml, storageRate);
+          if (hasMultipleDeliveryTerms) {
+            xml = removeDeliveryTermsLine(xml);
+          }
+          xml = updateStorageLine(xml, storageRate, hasStorageDeliveryPlace(confirmation));
           xml = replaceSignatureBlockWithConfirmationNote(xml);
           xml = removePackingLine(xml);
           xml = removeBankDetails(xml, isTransferPaymentTerm(confirmation.paymentTerms));
@@ -68,12 +78,17 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
-function buildReplacements(confirmation, { mode, hasMultipleOrigins = false }) {
+function buildReplacements(
+  confirmation,
+  { mode, hasMultipleOrigins = false, hasMultipleDeliveryTerms = false }
+) {
   const customer = confirmation.customer;
   const origin = getSingleOrigin(confirmation);
   const originLine = hasMultipleOrigins ? "" : `ORIGEN: ${origin}`;
   const showsBankDetails = isTransferPaymentTerm(confirmation.paymentTerms);
-  const customerMunicipality = customer?.city || "";
+  const deliveryLine = hasMultipleDeliveryTerms
+    ? "CONDICIONES DE ENTREGA: INCOTERM DE LA VENTA"
+    : `CONDICIONES DE ENTREGA: ${getSingleDeliveryTerm(confirmation)}`;
   const signatureName = sanitizeSingleLineText(
     customer?.fiscalName || customer?.commercialName || ""
   );
@@ -96,10 +111,7 @@ function buildReplacements(confirmation, { mode, hasMultipleOrigins = false }) {
     ],
     [
       "CONDICIONES DE ENTREGA: INCOTERM DE LA VENTA",
-      `CONDICIONES DE ENTREGA: ${deliveryTermsWithMunicipality(
-        confirmation.deliveryTerms,
-        customerMunicipality
-      )}`
+      deliveryLine
     ],
     ["PESO BOBINA: RANGO DEL ITEM DE COMPRA", ""],
   [
@@ -177,16 +189,21 @@ function formatDateEs(value) {
   return match ? `${match[3]}/${match[2]}/${match[1]}` : String(value);
 }
 
-function buildMerchandiseTableXml(confirmation, mode, hasMultipleOrigins = false) {
+function buildMerchandiseTableXml(confirmation, mode, options = {}) {
+  const tableOptions = {
+    hasMultipleOrigins: false,
+    hasMultipleDeliveryTerms: false,
+    ...options
+  };
   const lines = getConfirmationLines(confirmation, mode);
   const subtotal = sum(lines, "amount");
   const vat = roundMoney(subtotal * VAT_RATE);
   const total = roundMoney(subtotal + vat);
-  const tableWidths = getTableWidths(mode, hasMultipleOrigins);
+  const tableWidths = getTableWidths(mode, tableOptions);
   const rows = [
-    buildHeaderRow(mode, hasMultipleOrigins),
-    ...lines.map((line, index) => buildLineRow(line, index + 1, mode, hasMultipleOrigins)),
-    ...buildSummaryRows(lines, subtotal, vat, total, mode, hasMultipleOrigins)
+    buildHeaderRow(mode, tableOptions),
+    ...lines.map((line, index) => buildLineRow(line, index + 1, mode, tableOptions)),
+    ...buildSummaryRows(lines, subtotal, vat, total, tableWidths.length)
   ];
 
   return [
@@ -197,17 +214,21 @@ function buildMerchandiseTableXml(confirmation, mode, hasMultipleOrigins = false
     '<w:tblCellMar><w:top w:w="45" w:type="dxa"/><w:left w:w="45" w:type="dxa"/><w:bottom w:w="45" w:type="dxa"/><w:right w:w="45" w:type="dxa"/></w:tblCellMar>',
     "</w:tblPr>",
     `<w:tblGrid>${tableWidths.map((width) => `<w:gridCol w:w="${width}"/>`).join("")}</w:tblGrid>`,
-    rows.map(rowXml).join(""),
+    rows.map((row) => rowXml(row, tableWidths)).join(""),
     "</w:tbl>"
   ].join("");
 }
 
-function buildHeaderRow(mode, hasMultipleOrigins = false) {
+function buildHeaderRow(
+  mode,
+  { hasMultipleOrigins = false, hasMultipleDeliveryTerms = false } = {}
+) {
   if (mode === "detail") {
     return [
       cell("ITEM", { bold: true, align: "center", shade: "EDEDED" }),
       cell("ESPECIFICACIÓN", { bold: true, align: "center", shade: "EDEDED" }),
       ...(hasMultipleOrigins ? [cell("ORIGEN", { bold: true, align: "center", shade: "EDEDED" })] : []),
+      ...(hasMultipleDeliveryTerms ? [cell("COND. ENTREGA", { bold: true, align: "center", shade: "EDEDED" })] : []),
       cell("NÚMERO DE BOBINA", { span: 2, bold: true, align: "center", shade: "EDEDED" }),
       cell("PESO (MT)", { bold: true, align: "center", shade: "EDEDED" }),
       cell("PRECIO (EUR/MT)", { bold: true, align: "center", shade: "EDEDED" }),
@@ -219,6 +240,7 @@ function buildHeaderRow(mode, hasMultipleOrigins = false) {
       cell("ITEM", { bold: true, align: "center", shade: "EDEDED" }),
       cell("ESPECIFICACIÓN", { span: 2, bold: true, align: "center", shade: "EDEDED" }),
       ...(hasMultipleOrigins ? [cell("ORIGEN", { bold: true, align: "center", shade: "EDEDED" })] : []),
+      ...(hasMultipleDeliveryTerms ? [cell("COND. ENTREGA", { bold: true, align: "center", shade: "EDEDED" })] : []),
       cell("UNIDADES", { bold: true, align: "center", shade: "EDEDED" }),
       cell("PESO (MT)", { bold: true, align: "center", shade: "EDEDED" }),
       cell("PRECIO (EUR/MT)", { bold: true, align: "center", shade: "EDEDED" }),
@@ -229,6 +251,7 @@ function buildHeaderRow(mode, hasMultipleOrigins = false) {
     cell("ITEM", { bold: true, align: "center", shade: "EDEDED" }),
     cell("ESPECIFICACIÓN", { span: hasMultipleOrigins ? 2 : 3, bold: true, align: "center", shade: "EDEDED" }),
     ...(hasMultipleOrigins ? [cell("ORIGEN", { bold: true, align: "center", shade: "EDEDED" })] : []),
+    ...(hasMultipleDeliveryTerms ? [cell("COND. ENTREGA", { bold: true, align: "center", shade: "EDEDED" })] : []),
     cell("RANGO (MT)", { bold: true, align: "center", shade: "EDEDED" }),
     cell("PESO (MT)", { bold: true, align: "center", shade: "EDEDED" }),
     cell("PRECIO (EUR/MT)", { bold: true, align: "center", shade: "EDEDED" }),
@@ -236,28 +259,34 @@ function buildHeaderRow(mode, hasMultipleOrigins = false) {
   ];
 }
 
-function deliveryTermsWithMunicipality(deliveryTerms, municipality) {
+function deliveryTermsWithPlace(deliveryTerms, place) {
   const normalizedTerms = String(deliveryTerms || "").trim();
-  const normalizedMunicipality = String(municipality || "").trim();
+  const normalizedPlace = String(place || "").trim();
 
-  if (!normalizedTerms || !normalizedMunicipality) {
+  if (!normalizedTerms || !normalizedPlace) {
     return normalizedTerms;
   }
 
-  const normalized = normalizeForMatch(normalizedMunicipality);
+  const normalized = normalizeForMatch(normalizedPlace);
   const normalizedSource = normalizeForMatch(normalizedTerms);
   if (normalizedSource.endsWith(normalized)) return normalizedTerms;
 
-  return `${normalizedTerms} ${normalizedMunicipality}`;
+  return `${normalizedTerms} ${normalizedPlace}`;
 }
 
-function buildLineRow(line, index, mode, hasMultipleOrigins = false) {
+function buildLineRow(
+  line,
+  index,
+  mode,
+  { hasMultipleOrigins = false, hasMultipleDeliveryTerms = false } = {}
+) {
   const itemNumber = line.itemNumber || index;
   if (mode === "detail") {
     return [
       cell(itemNumber, { align: "center" }),
       cell(line.specification),
       ...(hasMultipleOrigins ? [cell(line.origin || "")] : []),
+      ...(hasMultipleDeliveryTerms ? [cell(line.deliveryTerms || "")] : []),
       cell(line.factoryId || "", { span: 2 }),
       cell(formatNumber(line.quantity, 3), { align: "right" }),
       cell(formatMoney(line.price), { align: "right" }),
@@ -269,6 +298,7 @@ function buildLineRow(line, index, mode, hasMultipleOrigins = false) {
       cell(itemNumber, { align: "center" }),
       cell(line.specification, { span: 2 }),
       ...(hasMultipleOrigins ? [cell(line.origin || "")] : []),
+      ...(hasMultipleDeliveryTerms ? [cell(line.deliveryTerms || "")] : []),
       cell(formatUnits(line.units), { align: "right" }),
       cell(formatNumber(line.quantity, 3), { align: "right" }),
       cell(formatMoney(line.price), { align: "right" }),
@@ -279,6 +309,7 @@ function buildLineRow(line, index, mode, hasMultipleOrigins = false) {
     cell(itemNumber, { align: "center" }),
     cell(line.specification, { span: hasMultipleOrigins ? 2 : 3 }),
     ...(hasMultipleOrigins ? [cell(line.origin || "")] : []),
+    ...(hasMultipleDeliveryTerms ? [cell(line.deliveryTerms || "")] : []),
     cell(formatCoilWeightRange(line.minNet, line.maxNet), { align: "right" }),
     cell(formatNumber(line.quantity, 3), { align: "right" }),
     cell(formatMoney(line.price), { align: "right" }),
@@ -286,38 +317,42 @@ function buildLineRow(line, index, mode, hasMultipleOrigins = false) {
   ];
 }
 
-function buildSummaryRows(lines, subtotal, vat, total, mode, hasMultipleOrigins = false) {
-  const quantityColSpan = hasMultipleOrigins && (mode === "detail" || mode === "formato3") ? 5 : 4;
-  const vatColSpan = hasMultipleOrigins && (mode === "detail" || mode === "formato3") ? 7 : 6;
-  const totalSpan = hasMultipleOrigins && (mode === "detail" || mode === "formato3") ? 8 : 7;
-  if (mode === "detail") {
-    return [
-      [cell("", { span: quantityColSpan }), cell(formatNumber(sum(lines, "quantity"), 3), { align: "right", bold: true }), cell(""), cell(formatMoney(subtotal), { align: "right", bold: true })],
-      [cell("IVA 21%", { span: vatColSpan, align: "right", bold: true }), cell(formatMoney(vat), { align: "right", bold: true })],
-      [cell(formatMoney(total), { span: totalSpan, align: "right", bold: true, shade: "EDEDED" })]
-    ];
-  }
-  if (mode === "formato3") {
-    return [
-      [cell("", { span: quantityColSpan }), cell(formatNumber(sum(lines, "quantity"), 3), { align: "right", bold: true }), cell(""), cell(formatMoney(subtotal), { align: "right", bold: true })],
-      [cell("IVA 21%", { span: vatColSpan, align: "right", bold: true }), cell(formatMoney(vat), { align: "right", bold: true })],
-      [cell(formatMoney(total), { span: totalSpan, align: "right", bold: true, shade: "EDEDED" })]
-    ];
-  }
-
+function buildSummaryRows(lines, subtotal, vat, total, columnCount) {
+  const quantityColSpan = columnCount - 3;
+  const vatColSpan = columnCount - 1;
+  const totalSpan = columnCount;
   return [
-    [cell("", { span: 5 }), cell(formatNumber(sum(lines, "quantity"), 3), { align: "right", bold: true }), cell(""), cell(formatMoney(subtotal), { align: "right", bold: true })],
-    [cell("IVA 21%", { span: 7, align: "right", bold: true }), cell(formatMoney(vat), { align: "right", bold: true })],
-    [cell(formatMoney(total), { span: 8, align: "right", bold: true, shade: "EDEDED" })]
+    [cell("", { span: quantityColSpan }), cell(formatNumber(sum(lines, "quantity"), 3), { align: "right", bold: true }), cell(""), cell(formatMoney(subtotal), { align: "right", bold: true })],
+    [cell("IVA 21%", { span: vatColSpan, align: "right", bold: true }), cell(formatMoney(vat), { align: "right", bold: true })],
+    [cell(formatMoney(total), { span: totalSpan, align: "right", bold: true, shade: "EDEDED" })]
   ];
 }
 
-function getTableWidths(mode, hasMultipleOrigins = false) {
-  if (mode === "detail" && hasMultipleOrigins) return TABLE_WIDTHS;
-  if (mode === "formato3" && hasMultipleOrigins) return TABLE_WIDTHS;
-  if (mode === "formato3") return SHEET_TABLE_WIDTHS;
-  if (mode === "detail") return TABLE_WIDTHS.slice(0, 7);
-  return TABLE_WIDTHS;
+function getTableWidths(
+  mode,
+  { hasMultipleOrigins = false, hasMultipleDeliveryTerms = false } = {}
+) {
+  const originWidths = hasMultipleOrigins ? [950] : [];
+  const deliveryWidths = hasMultipleDeliveryTerms ? [1400] : [];
+
+  if (mode === "detail") {
+    return [650, 2350, ...originWidths, ...deliveryWidths, 950, 1200, 1100, 1300, 1200];
+  }
+  if (mode === "formato3") {
+    return [650, 2350, 950, ...originWidths, ...deliveryWidths, 1100, 1100, 1300, 1200];
+  }
+
+  const specWidths = hasMultipleOrigins ? [2350, 950] : [2350, 950, 1200];
+  return [
+    650,
+    ...specWidths,
+    ...originWidths,
+    ...deliveryWidths,
+    1100,
+    1100,
+    1300,
+    1200
+  ];
 }
 
 function removeOriginLine(xml) {
@@ -356,6 +391,33 @@ function dedupeOrigins(values) {
   return [...new Set(values)];
 }
 
+function getDeliveryTermCount(confirmation) {
+  return getDeliveryTermList(confirmation).length;
+}
+
+function getSingleDeliveryTerm(confirmation) {
+  return getDeliveryTermList(confirmation)[0] || String(confirmation.deliveryTerms || "").trim();
+}
+
+function getDeliveryTermList(confirmation) {
+  const termsFromItems = (confirmation.items || [])
+    .map((item) =>
+      String(
+        item.deliveryTerms ||
+          deliveryTermsWithPlace(confirmation.deliveryTerms, item.deliveryPlace)
+      ).trim()
+    )
+    .filter(Boolean);
+
+  if (termsFromItems.length) {
+    return dedupeNormalizedText(termsFromItems);
+  }
+
+  return String(confirmation.deliveryTerms || "").trim()
+    ? [String(confirmation.deliveryTerms).trim()]
+    : [];
+}
+
 function replaceOriginLine(xml, replacementText) {
   if (!replacementText) return xml;
   return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
@@ -369,15 +431,38 @@ function replaceOriginLine(xml, replacementText) {
   });
 }
 
+function removeDeliveryTermsLine(xml) {
+  return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
+    const normalizedText = normalizeForMatch(paragraphText(paragraph))
+      .replace(/\s+/g, " ")
+      .trim();
+    return normalizedText.startsWith("condiciones de entrega:") ? "" : paragraph;
+  });
+}
+
+function dedupeNormalizedText(values) {
+  const seen = new Set();
+  const result = [];
+  for (const value of values) {
+    const normalized = normalizeForMatch(value)
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(value);
+  }
+  return result;
+}
+
 function cell(text, options = {}) {
   return { text: text ?? "", span: 1, align: "left", bold: false, shade: "", ...options };
 }
 
-function rowXml(row) {
+function rowXml(row, tableWidths) {
   let columnIndex = 0;
   const cells = row
     .map((tableCell) => {
-      const xml = cellXml(tableCell, columnIndex);
+      const xml = cellXml(tableCell, columnIndex, tableWidths);
       columnIndex += tableCell.span;
       return xml;
     })
@@ -385,11 +470,11 @@ function rowXml(row) {
   return `<w:tr>${cells}</w:tr>`;
 }
 
-function cellXml({ text, span, align, bold, shade }, columnIndex) {
-  const width = TABLE_WIDTHS.slice(columnIndex, columnIndex + span).reduce(
+function cellXml({ text, span, align, bold, shade }, columnIndex, tableWidths = TABLE_WIDTHS) {
+  const width = tableWidths.slice(columnIndex, columnIndex + span).reduce(
     (total, value) => total + value,
     0
-  );
+  ) || span * 1000;
   const props = [
     `<w:tcW w:w="${width}" w:type="dxa"/>`,
     span > 1 ? `<w:gridSpan w:val="${span}"/>` : "",
@@ -825,7 +910,16 @@ function shrinkHeaderLogoRun(logoRun) {
     .replace(/<a:ext cx="\d+" cy="\d+"\/>/, `<a:ext cx="${widthCx}" cy="${heightCy}"/>`);
 }
 
-function updateStorageLine(xml, storageRate) {
+function hasStorageDeliveryPlace(confirmation) {
+  return (confirmation.items || []).some((item) => {
+    const normalizedPlace = normalizeForMatch(item.deliveryPlace || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return normalizedPlace.includes("puerto") || normalizedPlace.includes("almacen");
+  });
+}
+
+function updateStorageLine(xml, storageRate, showStorageLine) {
   const storageText =
     `ALMACENAJES: 30 DÍAS LIBRES A PARTIR DE LA FECHA FACTURA, TRANSCURRIDO ESE PERIODO, SE FACTURARÁ A ${storageRate} €/MT POR DÍA.`;
   return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
@@ -840,6 +934,7 @@ function updateStorageLine(xml, storageRate) {
       (normalizedText.includes("se facturar") && normalizedText.includes("eur/mt"));
 
     if (!isStorageParagraph) return paragraph;
+    if (!showStorageLine) return "";
     return replaceParagraphText(
       paragraph,
       storageText

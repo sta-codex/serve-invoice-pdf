@@ -140,6 +140,8 @@ test("replaces merchandise header and origin line", async () => {
       items: [
         {
           ...fakeConfirmation().items[0],
+          deliveryPlace: "Llanera",
+          deliveryTerms: "DDP Llanera",
           sheetUnits: 20,
           quantity: 50,
           existences: []
@@ -178,7 +180,7 @@ test("replaces merchandise header and origin line", async () => {
   );
   const text = extractDocumentText(documentXml);
   assert.match(text, /ORIGEN: Planta Madrid \(ES \/ FR\)/);
-  assert.match(text, /CONDICIONES DE ENTREGA: DDP - Delivered Duty Paid Madrid/);
+  assert.match(text, /CONDICIONES DE ENTREGA: DDP Llanera/);
 });
 
 test("keeps body paragraph spacing tight with a blank line after long paragraphs", async () => {
@@ -218,7 +220,7 @@ test("keeps only labels bold in colon-separated paragraphs", async () => {
 
   assertOnlyLabelBold(documentXml, "ORIGEN:", "Planta Madrid (ES / FR)");
   assertOnlyLabelBold(documentXml, "CANTIDAD TOTAL:", "12.345,678 MT");
-  assertOnlyLabelBold(documentXml, "CONDICIONES DE ENTREGA:", "CPT Madrid");
+  assertOnlyLabelBold(documentXml, "CONDICIONES DE ENTREGA:", "CPT Puerto Madrid");
   assertOnlyLabelBold(documentXml, "CONDICIONES DE PAGO:", "Carta de crédito a 30 días fecha factura");
   assertOnlyLabelBold(documentXml, "ALMACENAJES:", "30 DÍAS LIBRES");
   assertOnlyLabelBold(documentXml, "RECLAMACIONES:", "Si se encuentran daños");
@@ -273,6 +275,46 @@ test("uses origin column when multiple origins are present", async () => {
   assert.match(documentXml, /ORIGEN/);
   assert.match(documentXml, /Planta Norte \(ES\)/);
   assert.match(documentXml, /Planta Sur \(FR\)/);
+});
+
+test("moves delivery terms into the merchandise table when multiple combinations exist", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      deliveryTerms: "DDP",
+      items: [
+        {
+          ...fakeConfirmation().items[0],
+          number: 1,
+          deliveryPlace: "Puerto Bilbao",
+          deliveryTerms: "DDP Puerto Bilbao",
+          quantity: 80,
+          amount: 68800,
+          existences: []
+        },
+        {
+          ...fakeConfirmation().items[0],
+          number: 2,
+          deliveryPlace: "Almacén Madrid",
+          deliveryTerms: "DDP Almacén Madrid",
+          quantity: 120,
+          amount: 103200,
+          existences: []
+        }
+      ],
+      totalQuantity: 200
+    },
+    {
+      mode: "formato1"
+    }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+
+  assert.doesNotMatch(documentXml, /CONDICIONES DE ENTREGA:/);
+  assert.match(documentXml, /COND\. ENTREGA/);
+  assert.match(documentXml, /DDP Puerto Bilbao/);
+  assert.match(documentXml, /DDP Almacén Madrid/);
 });
 
 test("adds bank details only when payment is transfer", async () => {
@@ -392,9 +434,27 @@ test("replaces signature block with final confirmation paragraph", async () => {
   assert.doesNotMatch(documentXml, /TECHOS FALSTECH/);
 });
 
-test("shows storage line in all formats with rate by material type", async () => {
+test("shows storage line only for puerto or almacen delivery places with rate by material type", async () => {
   const modes = ["formato1", "formato2", "formato3"];
   for (const mode of modes) {
+    const noStorageBuffer = await renderConfirmationDocx(
+      {
+        ...fakeConfirmation(),
+        items: [
+          {
+            ...fakeConfirmation().items[0],
+            deliveryPlace: "Obra Madrid",
+            deliveryTerms: "CPT Obra Madrid"
+          }
+        ]
+      },
+      { mode }
+    );
+    const noStorageDoc = await JSZip.loadAsync(noStorageBuffer);
+    const noStorageXml = await noStorageDoc.file("word/document.xml").async("string");
+
+    assert.equal(storageParagraph(noStorageXml), undefined);
+
     const coilBuffer = await renderConfirmationDocx(
       {
         ...fakeConfirmation(),
@@ -434,6 +494,24 @@ test("shows storage line in all formats with rate by material type", async () =>
     assert.doesNotMatch(sheetStorageParagraph, /w:color w:val="EE0000"/);
     assert.match(sheetStorageParagraph, /w:color w:val="000000"/);
     assert.doesNotMatch(sheetXml, /PARA LA BOBINA|PARA LA CHAPA/);
+
+    const accentedStorageBuffer = await renderConfirmationDocx(
+      {
+        ...fakeConfirmation(),
+        items: [
+          {
+            ...fakeConfirmation().items[0],
+            deliveryPlace: "ALMACÉN Central",
+            deliveryTerms: "CPT ALMACÉN Central"
+          }
+        ]
+      },
+      { mode }
+    );
+    const accentedStorageDoc = await JSZip.loadAsync(accentedStorageBuffer);
+    const accentedStorageXml = await accentedStorageDoc.file("word/document.xml").async("string");
+
+    assert.ok(storageParagraph(accentedStorageXml));
   }
 });
 
@@ -445,7 +523,7 @@ function fakeConfirmation() {
     totalQuantity: 200,
     toleranceMinus: 0.1,
     tolerancePlus: 0.1,
-    deliveryTerms: "CPT Madrid",
+    deliveryTerms: "CPT",
     paymentTerms: "Transferencia",
     customer: {
       fiscalName: "Cliente Test",
@@ -461,6 +539,8 @@ function fakeConfirmation() {
       {
         number: 1,
         specification: "S235JR 2,00 x 1000 x 2000",
+        deliveryPlace: "Puerto Madrid",
+        deliveryTerms: "CPT Puerto Madrid",
         sheetUnits: 50,
         quantity: 200,
         price: 860,
