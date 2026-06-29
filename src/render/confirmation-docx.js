@@ -21,7 +21,7 @@ const BANK_DETAILS_TEXT = "DETALLES BANCARIOS: CAIXA BANK - ES40 2100 6428 2213 
 const FINAL_CONFIRMATION_TEXT =
   "Salvo comunicación expresa en contra por escrito dentro de las 24 horas siguientes a la recepción de esta confirmación, el pedido se dará por confirmado en todos sus términos.";
 const RECLAMACIONES_TEXT =
-  "RECLAMACIONES: Si se encuentran daños en las condiciones de los bienes, o hay alguna disputa sobre calidad/cantidad/peso, se debe enviar un reclamo, incluyendo fotografías, informe de inspección, descripción detallada del reclamo o problema, al vendedor después de la entrega con un máximo de 30 días después de la llegada de los bienes a las instalaciones del cliente para defectos visibles y con un plazo de 45 para el resto de los defectos. Cualquier reclamo debe enviarse al vendedor por correo electrónico al menos a las siguientes direcciones de correo electrónico: rfernandez@steeltradeadvisors.com y icaymerich@steeltradeadvisors.com.";
+  "RECLAMACIONES: Si se encuentran daños en las condiciones de los bienes, o hay alguna disputa sobre calidad/cantidad/peso, se debe enviar un reclamo, incluyendo fotografías, informe de inspección, descripción detallada del reclamo o problema, al vendedor después de la entrega con un máximo de 30 días después de la llegada de los bienes a las instalaciones del cliente para defectos visibles y con un plazo de 45 para el resto de los defectos. Cualquier reclamo debe enviarse al vendedor por correo electrónico al menos a las siguientes direcciones de correo electrónico: rfernandez@steeltradeadvisors.com y andres@steeltradeadvisors.com.";
 
 export async function renderConfirmationDocx(confirmation, { mode }) {
   const zip = await JSZip.loadAsync(readFileSync(TEMPLATE_URL));

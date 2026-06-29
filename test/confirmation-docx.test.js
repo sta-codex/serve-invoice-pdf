@@ -410,8 +410,9 @@ test("uses final reclamaciones text", async () => {
 
   assert.match(
     extractDocumentText(documentXml),
-    /RECLAMACIONES: Si se encuentran da\u00f1os en las condiciones de los bienes[\s\S]*al menos a las siguientes direcciones de correo electr\u00f3nico: rfernandez@steeltradeadvisors\.com y icaymerich@steeltradeadvisors\.com\./
+    /RECLAMACIONES: Si se encuentran da\u00f1os en las condiciones de los bienes[\s\S]*al menos a las siguientes direcciones de correo electr\u00f3nico: rfernandez@steeltradeadvisors\.com y andres@steeltradeadvisors\.com\./
   );
+  assert.doesNotMatch(extractDocumentText(documentXml), /icaymerich@steeltradeadvisors\.com/);
 });
 
 test("keeps legal common nouns in normal Spanish lowercase", async () => {
