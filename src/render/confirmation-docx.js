@@ -1006,12 +1006,18 @@ function findPreviousBodyParagraph(paragraphs, beforeIndex) {
 }
 
 function buildFinalConfirmationParagraph(sourceParagraph) {
-  return setParagraphJustification(
-    setParagraphBold(
-      replaceParagraphText(sourceParagraph, FINAL_CONFIRMATION_TEXT)
-    ),
-    "both"
+  return removeParagraphIndentation(
+    setParagraphJustification(
+      setParagraphBold(
+        replaceParagraphText(sourceParagraph, FINAL_CONFIRMATION_TEXT)
+      ),
+      "both"
+    )
   );
+}
+
+function removeParagraphIndentation(paragraph) {
+  return paragraph.replace(/<w:ind\b[^>]*\/>/g, "");
 }
 
 function shouldRemovePackingLine(text) {

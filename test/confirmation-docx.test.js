@@ -417,27 +417,33 @@ test("always keeps fixed documentos lines in all formats", async () => {
   }
 });
 
-test("replaces signature block with final confirmation paragraph", async () => {
-  const buffer = await renderConfirmationDocx(fakeConfirmation(), { mode: "formato1" });
-  const zip = await JSZip.loadAsync(buffer);
-  const documentXml = await zip.file("word/document.xml").async("string");
-  const paragraphs = [...documentXml.matchAll(/<w:p[\s\S]*?<\/w:p>/g)]
-    .map((match) => match[0]);
-  const finalParagraph = paragraphs.find((paragraph) =>
-    extractParagraphText(paragraph).startsWith("Salvo comunicación expresa en contra")
-  );
+test("replaces signature block with final confirmation paragraph in all formats", async () => {
+  for (const mode of ["formato1", "detail", "formato3"]) {
+    const confirmation = {
+      ...fakeConfirmation(),
+      hasSheetMaterial: mode === "formato3"
+    };
+    const buffer = await renderConfirmationDocx(confirmation, { mode });
+    const zip = await JSZip.loadAsync(buffer);
+    const documentXml = await zip.file("word/document.xml").async("string");
+    const paragraphs = [...documentXml.matchAll(/<w:p[\s\S]*?<\/w:p>/g)]
+      .map((match) => match[0]);
+    const finalParagraph = paragraphs.find((paragraph) =>
+      extractParagraphText(paragraph).startsWith("Salvo comunicación expresa en contra")
+    );
 
-  assert.ok(finalParagraph, "The final confirmation paragraph should be present");
-  assert.equal(
-    extractParagraphText(finalParagraph),
-    "Salvo comunicación expresa en contra por escrito dentro de las 24 horas siguientes a la recepción de esta confirmación, el pedido se dará por confirmado en todos sus términos."
-  );
-  assert.match(finalParagraph, /<w:jc w:val="both"\/>/);
-  assert.doesNotMatch(finalParagraph, /<w:ind\b/);
-  assert.match(finalParagraph, /<w:b\/>/);
-  assert.doesNotMatch(documentXml, /FOR AND ON BEHALF OF/);
-  assert.doesNotMatch(documentXml, /STEEL TRADE ADVISORS, S\.L\.U\./);
-  assert.doesNotMatch(documentXml, /TECHOS FALSTECH/);
+    assert.ok(finalParagraph, `The final confirmation paragraph should be present in ${mode}`);
+    assert.equal(
+      extractParagraphText(finalParagraph),
+      "Salvo comunicación expresa en contra por escrito dentro de las 24 horas siguientes a la recepción de esta confirmación, el pedido se dará por confirmado en todos sus términos."
+    );
+    assert.match(finalParagraph, /<w:jc w:val="both"\/>/);
+    assert.doesNotMatch(finalParagraph, /<w:ind\b/);
+    assert.match(finalParagraph, /<w:b\/>/);
+    assert.doesNotMatch(documentXml, /FOR AND ON BEHALF OF/);
+    assert.doesNotMatch(documentXml, /STEEL TRADE ADVISORS, S\.L\.U\./);
+    assert.doesNotMatch(documentXml, /TECHOS FALSTECH/);
+  }
 });
 
 test("shows storage line only for eligible client delivery places with rate by material type", async () => {
