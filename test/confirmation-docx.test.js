@@ -137,6 +137,12 @@ test("keeps long customer header name in one right-aligned cell", async () => {
   const nameParagraphIndex = headerParagraphs.findIndex((paragraph) =>
     extractParagraphText(paragraph).includes(customerName)
   );
+  const taxIdParagraphIndex = headerParagraphs.findIndex((paragraph) =>
+    extractParagraphText(paragraph).includes("B83481002")
+  );
+  const dateParagraphIndex = headerParagraphs.findIndex((paragraph) =>
+    extractParagraphText(paragraph).includes("24/06/2026")
+  );
 
   assert.equal(logoParagraph.includes(customerName), false);
   assert.equal(nameParagraphs.length, 1);
@@ -149,6 +155,12 @@ test("keeps long customer header name in one right-aligned cell", async () => {
   );
   assert.match(headerTable, /<w:noWrap\/>/);
   assert.match(nameParagraphs[0], /<w:jc w:val="right"\/>/);
+  assert.equal(dateParagraphIndex, taxIdParagraphIndex + 2);
+  assert.equal(extractParagraphText(headerParagraphs[taxIdParagraphIndex + 1]), "");
+  assert.match(
+    headerParagraphs[taxIdParagraphIndex + 1],
+    /<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"\/>/
+  );
 });
 
 test("replaces merchandise header and origin line", async () => {
