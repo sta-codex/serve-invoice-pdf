@@ -31,5 +31,15 @@ export function buildMeasure({ thickness, width, length, fallback }) {
   const parts = [thickness, width, length].filter(
     (part) => part !== undefined && part !== null && part !== ""
   );
-  return parts.map((part) => String(part).replace(".", ",")).join(" x ");
+  return parts.map((part, index) =>
+    index === 0 ? formatThickness(part) : String(part).replace(".", ",")
+  ).join(" x ");
+}
+
+function formatThickness(value) {
+  const normalized = String(value).replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed)
+    ? formatNumber(parsed, 2)
+    : String(value).replace(".", ",");
 }
