@@ -851,8 +851,11 @@ function buildCustomerHeaderTable({
   const rightWidth = tableWidth - leftWidth;
   const cellProps = (width, extraProps = "") =>
     `<w:tcPr><w:tcW w:w="${width}" w:type="dxa"/><w:vAlign w:val="top"/>${extraProps}</w:tcPr>`;
-  const textParagraph = (text, { bold = false, size = 20, noWrap = false, fitWidth = "" } = {}) => [
-    `<w:p><w:pPr><w:spacing w:after="0"/><w:jc w:val="right"/>${noWrap ? "<w:noWrap/>" : ""}${fitWidth ? `<w:fitText w:val="${fitWidth}"/>` : ""}</w:pPr>`,
+  const textParagraph = (
+    text,
+    { bold = false, size = 20, noWrap = false, fitWidth = "", spacingBefore = "0" } = {}
+  ) => [
+    `<w:p><w:pPr><w:spacing w:before="${spacingBefore}" w:after="0"/><w:jc w:val="right"/>${noWrap ? "<w:noWrap/>" : ""}${fitWidth ? `<w:fitText w:val="${fitWidth}"/>` : ""}</w:pPr>`,
     "<w:r>",
     `<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>${bold ? "<w:b/><w:bCs/>" : ""}<w:sz w:val="${size}"/><w:szCs w:val="${size}"/></w:rPr>`,
     `<w:t xml:space="preserve">${escapeXml(text)}</w:t>`,
@@ -862,12 +865,6 @@ function buildCustomerHeaderTable({
   const customerTopSpacer = [
     "<w:p>",
     '<w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/></w:pPr>',
-    "</w:p>"
-  ].join("");
-  const customerHeaderBlankLine = [
-    "<w:p>",
-    '<w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/><w:jc w:val="right"/></w:pPr>',
-    '<w:r><w:t xml:space="preserve">\u00a0</w:t></w:r>',
     "</w:p>"
   ].join("");
   const rightParagraphs = [
@@ -880,8 +877,7 @@ function buildCustomerHeaderTable({
     }),
     textParagraph(customerAddressText),
     textParagraph(customerTaxId),
-    customerHeaderBlankLine,
-    textParagraph(confirmationDate)
+    textParagraph(confirmationDate, { spacingBefore: "240" })
   ].join("");
 
   return [

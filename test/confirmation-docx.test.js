@@ -155,12 +155,10 @@ test("keeps long customer header name in one right-aligned cell", async () => {
     );
     assert.match(headerTable, /<w:noWrap\/>/);
     assert.match(nameParagraphs[0], /<w:jc w:val="right"\/>/);
-    assert.equal(dateParagraphIndex, taxIdParagraphIndex + 2);
-    assert.equal(extractParagraphText(headerParagraphs[taxIdParagraphIndex + 1]).trim(), "");
-    assert.match(headerParagraphs[taxIdParagraphIndex + 1], /<w:t xml:space="preserve">\u00a0<\/w:t>/);
+    assert.equal(dateParagraphIndex, taxIdParagraphIndex + 1);
     assert.match(
-      headerParagraphs[taxIdParagraphIndex + 1],
-      /<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"\/>/
+      headerParagraphs[dateParagraphIndex],
+      /<w:spacing w:before="240" w:after="0"\/>/
     );
   }
 });
