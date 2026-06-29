@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ITEM_VENTA } from "../src/airtable/fields.js";
-import { loadedQuantityByCustomerWeightMode } from "../src/services/confirmation-service.js";
+import {
+  confirmationTotalQuantity,
+  loadedQuantityByCustomerWeightMode
+} from "../src/services/confirmation-service.js";
 
 test("selects loaded net or gross weight by customer mode", () => {
   const fields = {
@@ -11,5 +14,13 @@ test("selects loaded net or gross weight by customer mode", () => {
 
   assert.equal(loadedQuantityByCustomerWeightMode(fields, "Neto"), 10.5);
   assert.equal(loadedQuantityByCustomerWeightMode(fields, "Bruto"), 11.25);
-  assert.equal(loadedQuantityByCustomerWeightMode(fields, ""), 10.5);
+  assert.equal(loadedQuantityByCustomerWeightMode(fields, ""), 11.25);
+});
+
+test("uses loaded item total before theoretical contract weight", () => {
+  assert.equal(
+    confirmationTotalQuantity([{ quantity: 65.66 }], 88),
+    65.66
+  );
+  assert.equal(confirmationTotalQuantity([{ quantity: 0 }], 88), 88);
 });

@@ -205,9 +205,10 @@ function normalizeConfirmation({
     .sort(compareItemNumber);
 
   const hasSheetMaterial = items.some((item) => isSheetType(item.materialType));
-  const totalQuantity =
-    numberValue(fields[CONTRATO_VENTA.PESO_POR_CONTRATO]) ||
-    roundQuantity(items.reduce((sum, item) => sum + item.quantity, 0));
+  const totalQuantity = confirmationTotalQuantity(
+    items,
+    fields[CONTRATO_VENTA.PESO_POR_CONTRATO]
+  );
   const origins = dedupe(
     items
       .map((item) => item.origin)
@@ -293,7 +294,7 @@ function normalizeSaleItem({
   const itemCustomerWeightMode =
     normalizeWeightMode(firstText(fields[ITEM_VENTA_NETO_BRUTO_CLIENTE_FIELD_ID])) ||
     customerWeightMode ||
-    "neto";
+    "bruto";
   const selectedLoadedQuantity = loadedQuantityByCustomerWeightMode(
     fields,
     itemCustomerWeightMode
@@ -592,9 +593,16 @@ export function isSheetType(value) {
 }
 
 export function loadedQuantityByCustomerWeightMode(fields, customerWeightMode) {
-  const mode = normalizeWeightMode(customerWeightMode) || "neto";
+  const mode = normalizeWeightMode(customerWeightMode) || "bruto";
   if (mode === "bruto") return numberValue(fields[ITEM_VENTA.BRUTO_CARGADO]);
   return numberValue(fields[ITEM_VENTA.NETO_CARGADO]);
+}
+
+export function confirmationTotalQuantity(items, contractQuantity) {
+  const loadedItemsTotalQuantity = roundQuantity(
+    items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+  );
+  return loadedItemsTotalQuantity || numberValue(contractQuantity) || 0;
 }
 
 function groupExistencesBySaleItem(records) {
