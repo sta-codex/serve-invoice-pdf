@@ -79,6 +79,22 @@ test("formats quantities and money with thousands separators", async () => {
   assert.match(documentXml, /148\.148,14/);
 });
 
+test("labels the final merchandise table row as total", async () => {
+  const buffer = await renderConfirmationDocx(fakeConfirmation(), {
+    mode: "formato1"
+  });
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+  const table = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)]
+    .map((match) => match[0])
+    .find((candidate) => extractParagraphText(candidate).includes("TOTAL EUR"));
+  const rows = [...table.matchAll(/<w:tr>[\s\S]*?<\/w:tr>/g)].map((match) => match[0]);
+  const lastRowCells = [...rows.at(-1).matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)]
+    .map((match) => extractParagraphText(match[0]));
+
+  assert.deepEqual(lastRowCells, ["TOTAL", "208.120,00"]);
+});
+
 test("shows total quantity tolerance only in grouped format", async () => {
   const groupedBuffer = await renderConfirmationDocx(fakeConfirmation(), {
     mode: "formato1"

@@ -320,7 +320,7 @@ function buildSummaryRows(lines, subtotal, vat, total, columnCount) {
   return [
     [cell("", { span: quantityColSpan }), cell(formatNumber(sum(lines, "quantity"), 3), { align: "right", bold: true }), cell(""), cell(formatMoney(subtotal), { align: "right", bold: true })],
     [cell("IVA 21%", { span: vatColSpan, align: "right", bold: true }), cell(formatMoney(vat), { align: "right", bold: true })],
-    [cell(formatMoney(total), { span: totalSpan, align: "right", bold: true, shade: "EDEDED" })]
+    [cell("TOTAL", { span: totalSpan - 1, align: "right", bold: true, shade: "EDEDED" }), cell(formatMoney(total), { align: "right", bold: true, shade: "EDEDED" })]
   ];
 }
 
