@@ -867,6 +867,7 @@ function buildCustomerHeaderTable({
   const customerHeaderBlankLine = [
     "<w:p>",
     '<w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/><w:jc w:val="right"/></w:pPr>',
+    '<w:r><w:t xml:space="preserve">\u00a0</w:t></w:r>',
     "</w:p>"
   ].join("");
   const rightParagraphs = [

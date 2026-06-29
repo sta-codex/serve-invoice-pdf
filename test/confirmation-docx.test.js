@@ -102,65 +102,67 @@ test("shows total quantity tolerance only in grouped format", async () => {
 
 test("keeps long customer header name in one right-aligned cell", async () => {
   const customerName = "Arcelormital Distribuci\u00f3n, S.L.";
-  const buffer = await renderConfirmationDocx(
-    {
-      ...fakeConfirmation(),
-      customer: {
-        ...fakeConfirmation().customer,
-        fiscalName: customerName,
-        address: "P.I. Silvota, C/ Pe\u00f1a Ten Parcela 13",
-        postalCode: "33690",
-        city: "Llanera",
-        province: "Asturias",
-        country: "Espa\u00f1a",
-        taxId: "B83481002"
-      }
-    },
-    {
-      mode: "detail"
-    }
-  );
-  const zip = await JSZip.loadAsync(buffer);
-  const documentXml = await zip.file("word/document.xml").async("string");
-  const paragraphs = [...documentXml.matchAll(/<w:p[\s\S]*?<\/w:p>/g)].map((match) => match[0]);
-  const logoParagraph = paragraphs.find((paragraph) => paragraph.includes("<w:drawing"));
-  const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map((match) => match[0]);
-  const headerTable = tables.find((table) => extractParagraphText(table).includes(customerName));
+  for (const mode of ["formato1", "detail", "formato3"]) {
+    const buffer = await renderConfirmationDocx(
+      {
+        ...fakeConfirmation(),
+        hasSheetMaterial: mode === "formato3",
+        customer: {
+          ...fakeConfirmation().customer,
+          fiscalName: customerName,
+          address: "P.I. Silvota, C/ Pe\u00f1a Ten Parcela 13",
+          postalCode: "33690",
+          city: "Llanera",
+          province: "Asturias",
+          country: "Espa\u00f1a",
+          taxId: "B83481002"
+        }
+      },
+      { mode }
+    );
+    const zip = await JSZip.loadAsync(buffer);
+    const documentXml = await zip.file("word/document.xml").async("string");
+    const paragraphs = [...documentXml.matchAll(/<w:p[\s\S]*?<\/w:p>/g)].map((match) => match[0]);
+    const logoParagraph = paragraphs.find((paragraph) => paragraph.includes("<w:drawing"));
+    const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map((match) => match[0]);
+    const headerTable = tables.find((table) => extractParagraphText(table).includes(customerName));
 
-  assert.ok(headerTable, "The customer name should be rendered in the header table");
-  assert.ok(logoParagraph, "The header should keep the STA logo");
-  assert.match(logoParagraph, /<w:ind w:left="-432"\/>/);
-  const nameParagraphs = [...headerTable.matchAll(/<w:p[\s\S]*?<\/w:p>/g)]
-    .map((match) => match[0])
-    .filter((paragraph) => extractParagraphText(paragraph).includes(customerName));
-  const headerParagraphs = [...headerTable.matchAll(/<w:p[\s\S]*?<\/w:p>/g)].map((match) => match[0]);
-  const nameParagraphIndex = headerParagraphs.findIndex((paragraph) =>
-    extractParagraphText(paragraph).includes(customerName)
-  );
-  const taxIdParagraphIndex = headerParagraphs.findIndex((paragraph) =>
-    extractParagraphText(paragraph).includes("B83481002")
-  );
-  const dateParagraphIndex = headerParagraphs.findIndex((paragraph) =>
-    extractParagraphText(paragraph).includes("24/06/2026")
-  );
+    assert.ok(headerTable, `The customer name should be rendered in the header table for ${mode}`);
+    assert.ok(logoParagraph, `The header should keep the STA logo for ${mode}`);
+    assert.match(logoParagraph, /<w:ind w:left="-432"\/>/);
+    const nameParagraphs = [...headerTable.matchAll(/<w:p[\s\S]*?<\/w:p>/g)]
+      .map((match) => match[0])
+      .filter((paragraph) => extractParagraphText(paragraph).includes(customerName));
+    const headerParagraphs = [...headerTable.matchAll(/<w:p[\s\S]*?<\/w:p>/g)].map((match) => match[0]);
+    const nameParagraphIndex = headerParagraphs.findIndex((paragraph) =>
+      extractParagraphText(paragraph).includes(customerName)
+    );
+    const taxIdParagraphIndex = headerParagraphs.findIndex((paragraph) =>
+      extractParagraphText(paragraph).includes("B83481002")
+    );
+    const dateParagraphIndex = headerParagraphs.findIndex((paragraph) =>
+      extractParagraphText(paragraph).includes("24/06/2026")
+    );
 
-  assert.equal(logoParagraph.includes(customerName), false);
-  assert.equal(nameParagraphs.length, 1);
-  assert.equal(extractParagraphText(nameParagraphs[0]), customerName);
-  assert.ok(nameParagraphIndex > 0, "The customer name should follow the top spacer");
-  assert.equal(extractParagraphText(headerParagraphs[nameParagraphIndex - 1]), "");
-  assert.match(
-    headerParagraphs[nameParagraphIndex - 1],
-    /<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"\/>/
-  );
-  assert.match(headerTable, /<w:noWrap\/>/);
-  assert.match(nameParagraphs[0], /<w:jc w:val="right"\/>/);
-  assert.equal(dateParagraphIndex, taxIdParagraphIndex + 2);
-  assert.equal(extractParagraphText(headerParagraphs[taxIdParagraphIndex + 1]), "");
-  assert.match(
-    headerParagraphs[taxIdParagraphIndex + 1],
-    /<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"\/>/
-  );
+    assert.equal(logoParagraph.includes(customerName), false);
+    assert.equal(nameParagraphs.length, 1);
+    assert.equal(extractParagraphText(nameParagraphs[0]), customerName);
+    assert.ok(nameParagraphIndex > 0, "The customer name should follow the top spacer");
+    assert.equal(extractParagraphText(headerParagraphs[nameParagraphIndex - 1]), "");
+    assert.match(
+      headerParagraphs[nameParagraphIndex - 1],
+      /<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"\/>/
+    );
+    assert.match(headerTable, /<w:noWrap\/>/);
+    assert.match(nameParagraphs[0], /<w:jc w:val="right"\/>/);
+    assert.equal(dateParagraphIndex, taxIdParagraphIndex + 2);
+    assert.equal(extractParagraphText(headerParagraphs[taxIdParagraphIndex + 1]).trim(), "");
+    assert.match(headerParagraphs[taxIdParagraphIndex + 1], /<w:t xml:space="preserve">\u00a0<\/w:t>/);
+    assert.match(
+      headerParagraphs[taxIdParagraphIndex + 1],
+      /<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"\/>/
+    );
+  }
 });
 
 test("replaces merchandise header and origin line", async () => {
