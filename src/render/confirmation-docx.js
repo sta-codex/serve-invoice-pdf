@@ -26,16 +26,13 @@ const RECLAMACIONES_TEXT =
 export async function renderConfirmationDocx(confirmation, { mode }) {
   const zip = await JSZip.loadAsync(readFileSync(TEMPLATE_URL));
   const hasMultipleOrigins = getOriginCount(confirmation) > 1;
-  const hasMultipleDeliveryTerms = getDeliveryTermCount(confirmation) > 1;
   const origin = getSingleOrigin(confirmation);
   const replacements = buildReplacements(confirmation, {
     mode,
-    hasMultipleOrigins,
-    hasMultipleDeliveryTerms
+    hasMultipleOrigins
   });
   const merchandiseTable = buildMerchandiseTableXml(confirmation, mode, {
-    hasMultipleOrigins,
-    hasMultipleDeliveryTerms
+    hasMultipleOrigins
   });
   await Promise.all(
     Object.keys(zip.files)
@@ -61,9 +58,6 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
           } else {
             xml = replaceOriginLine(xml, `ORIGEN: ${origin}`);
           }
-          if (hasMultipleDeliveryTerms) {
-            xml = removeDeliveryTermsLine(xml);
-          }
           xml = updateStorageLine(xml, storageRate, hasStorageDeliveryPlace(confirmation));
           xml = replaceSignatureBlockWithConfirmationNote(xml);
           xml = removePackingLine(xml);
@@ -82,15 +76,13 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
 
 function buildReplacements(
   confirmation,
-  { mode, hasMultipleOrigins = false, hasMultipleDeliveryTerms = false }
+  { mode, hasMultipleOrigins = false }
 ) {
   const customer = confirmation.customer;
   const origin = getSingleOrigin(confirmation);
   const originLine = hasMultipleOrigins ? "" : `ORIGEN: ${origin}`;
   const showsBankDetails = isTransferPaymentTerm(confirmation.paymentTerms);
-  const deliveryLine = hasMultipleDeliveryTerms
-    ? "CONDICIONES DE ENTREGA: INCOTERM DE LA VENTA"
-    : `CONDICIONES DE ENTREGA: ${getSingleDeliveryTerm(confirmation)}`;
+  const deliveryLine = `CONDICIONES DE ENTREGA: ${getDeliveryTermsLine(confirmation)}`;
   const signatureName = sanitizeSingleLineText(
     customer?.fiscalName || customer?.commercialName || ""
   );
@@ -203,7 +195,6 @@ function formatDateEs(value) {
 function buildMerchandiseTableXml(confirmation, mode, options = {}) {
   const tableOptions = {
     hasMultipleOrigins: false,
-    hasMultipleDeliveryTerms: false,
     ...options
   };
   const lines = getConfirmationLines(confirmation, mode);
@@ -232,14 +223,13 @@ function buildMerchandiseTableXml(confirmation, mode, options = {}) {
 
 function buildHeaderRow(
   mode,
-  { hasMultipleOrigins = false, hasMultipleDeliveryTerms = false } = {}
+  { hasMultipleOrigins = false } = {}
 ) {
   if (mode === "detail") {
     return [
       cell("ITEM", { bold: true, align: "center", shade: "EDEDED" }),
       cell("ESPECIFICACIÓN", { bold: true, align: "center", shade: "EDEDED" }),
       ...(hasMultipleOrigins ? [cell("ORIGEN", { bold: true, align: "center", shade: "EDEDED" })] : []),
-      ...(hasMultipleDeliveryTerms ? [cell("COND. ENTREGA", { bold: true, align: "center", shade: "EDEDED" })] : []),
       cell("NÚMERO DE BOBINA", { span: 2, bold: true, align: "center", shade: "EDEDED" }),
       cell("PESO (MT)", { bold: true, align: "center", shade: "EDEDED" }),
       cell("PRECIO (EUR/MT)", { bold: true, align: "center", shade: "EDEDED" }),
@@ -251,7 +241,6 @@ function buildHeaderRow(
       cell("ITEM", { bold: true, align: "center", shade: "EDEDED" }),
       cell("ESPECIFICACIÓN", { span: 2, bold: true, align: "center", shade: "EDEDED" }),
       ...(hasMultipleOrigins ? [cell("ORIGEN", { bold: true, align: "center", shade: "EDEDED" })] : []),
-      ...(hasMultipleDeliveryTerms ? [cell("COND. ENTREGA", { bold: true, align: "center", shade: "EDEDED" })] : []),
       cell("UNIDADES", { bold: true, align: "center", shade: "EDEDED" }),
       cell("PESO (MT)", { bold: true, align: "center", shade: "EDEDED" }),
       cell("PRECIO (EUR/MT)", { bold: true, align: "center", shade: "EDEDED" }),
@@ -262,7 +251,6 @@ function buildHeaderRow(
     cell("ITEM", { bold: true, align: "center", shade: "EDEDED" }),
     cell("ESPECIFICACIÓN", { span: hasMultipleOrigins ? 2 : 3, bold: true, align: "center", shade: "EDEDED" }),
     ...(hasMultipleOrigins ? [cell("ORIGEN", { bold: true, align: "center", shade: "EDEDED" })] : []),
-    ...(hasMultipleDeliveryTerms ? [cell("COND. ENTREGA", { bold: true, align: "center", shade: "EDEDED" })] : []),
     cell("RANGO (MT)", { bold: true, align: "center", shade: "EDEDED" }),
     cell("PESO (MT)", { bold: true, align: "center", shade: "EDEDED" }),
     cell("PRECIO (EUR/MT)", { bold: true, align: "center", shade: "EDEDED" }),
@@ -289,7 +277,7 @@ function buildLineRow(
   line,
   index,
   mode,
-  { hasMultipleOrigins = false, hasMultipleDeliveryTerms = false } = {}
+  { hasMultipleOrigins = false } = {}
 ) {
   const itemNumber = line.itemNumber || index;
   if (mode === "detail") {
@@ -297,7 +285,6 @@ function buildLineRow(
       cell(itemNumber, { align: "center" }),
       cell(line.specification),
       ...(hasMultipleOrigins ? [cell(line.origin || "")] : []),
-      ...(hasMultipleDeliveryTerms ? [cell(line.deliveryTerms || "")] : []),
       cell(line.factoryId || "", { span: 2 }),
       cell(formatNumber(line.quantity, 3), { align: "right" }),
       cell(formatMoney(line.price), { align: "right" }),
@@ -309,7 +296,6 @@ function buildLineRow(
       cell(itemNumber, { align: "center" }),
       cell(line.specification, { span: 2 }),
       ...(hasMultipleOrigins ? [cell(line.origin || "")] : []),
-      ...(hasMultipleDeliveryTerms ? [cell(line.deliveryTerms || "")] : []),
       cell(formatUnits(line.units), { align: "right" }),
       cell(formatNumber(line.quantity, 3), { align: "right" }),
       cell(formatMoney(line.price), { align: "right" }),
@@ -320,7 +306,6 @@ function buildLineRow(
     cell(itemNumber, { align: "center" }),
     cell(line.specification, { span: hasMultipleOrigins ? 2 : 3 }),
     ...(hasMultipleOrigins ? [cell(line.origin || "")] : []),
-    ...(hasMultipleDeliveryTerms ? [cell(line.deliveryTerms || "")] : []),
     cell(formatCoilWeightRange(line.minNet, line.maxNet), { align: "right" }),
     cell(formatNumber(line.quantity, 3), { align: "right" }),
     cell(formatMoney(line.price), { align: "right" }),
@@ -341,16 +326,15 @@ function buildSummaryRows(lines, subtotal, vat, total, columnCount) {
 
 function getTableWidths(
   mode,
-  { hasMultipleOrigins = false, hasMultipleDeliveryTerms = false } = {}
+  { hasMultipleOrigins = false } = {}
 ) {
   const originWidths = hasMultipleOrigins ? [950] : [];
-  const deliveryWidths = hasMultipleDeliveryTerms ? [1400] : [];
 
   if (mode === "detail") {
-    return [650, 2350, ...originWidths, ...deliveryWidths, 950, 1200, 1100, 1300, 1200];
+    return [650, 2350, ...originWidths, 950, 1200, 1100, 1300, 1200];
   }
   if (mode === "formato3") {
-    return [650, 2350, 950, ...originWidths, ...deliveryWidths, 1100, 1100, 1300, 1200];
+    return [650, 2350, 950, ...originWidths, 1100, 1100, 1300, 1200];
   }
 
   const specWidths = hasMultipleOrigins ? [2350, 950] : [2350, 950, 1200];
@@ -358,7 +342,6 @@ function getTableWidths(
     650,
     ...specWidths,
     ...originWidths,
-    ...deliveryWidths,
     1100,
     1100,
     1300,
@@ -402,12 +385,8 @@ function dedupeOrigins(values) {
   return [...new Set(values)];
 }
 
-function getDeliveryTermCount(confirmation) {
-  return getDeliveryTermList(confirmation).length;
-}
-
-function getSingleDeliveryTerm(confirmation) {
-  return getDeliveryTermList(confirmation)[0] || String(confirmation.deliveryTerms || "").trim();
+function getDeliveryTermsLine(confirmation) {
+  return getDeliveryTermList(confirmation).join(", ") || String(confirmation.deliveryTerms || "").trim();
 }
 
 function getDeliveryTermList(confirmation) {
@@ -439,15 +418,6 @@ function replaceOriginLine(xml, replacementText) {
       normalizedText.includes("fabrica") &&
       normalizedText.includes("pais");
     return isOriginTemplateLine ? replaceParagraphText(paragraph, replacementText) : paragraph;
-  });
-}
-
-function removeDeliveryTermsLine(xml) {
-  return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
-    const normalizedText = normalizeForMatch(paragraphText(paragraph))
-      .replace(/\s+/g, " ")
-      .trim();
-    return normalizedText.startsWith("condiciones de entrega:") ? "" : paragraph;
   });
 }
 

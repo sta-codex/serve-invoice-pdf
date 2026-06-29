@@ -316,44 +316,47 @@ test("uses origin column when multiple origins are present", async () => {
   assert.match(documentXml, /Planta Sur \(FR\)/);
 });
 
-test("moves delivery terms into the merchandise table when multiple combinations exist", async () => {
-  const buffer = await renderConfirmationDocx(
-    {
-      ...fakeConfirmation(),
-      deliveryTerms: "DDP",
-      items: [
-        {
-          ...fakeConfirmation().items[0],
-          number: 1,
-          deliveryPlace: "Puerto Bilbao",
-          deliveryTerms: "DDP Puerto Bilbao",
-          quantity: 80,
-          amount: 68800,
-          existences: []
-        },
-        {
-          ...fakeConfirmation().items[0],
-          number: 2,
-          deliveryPlace: "Almacén Madrid",
-          deliveryTerms: "DDP Almacén Madrid",
-          quantity: 120,
-          amount: 103200,
-          existences: []
-        }
-      ],
-      totalQuantity: 200
-    },
-    {
-      mode: "formato1"
-    }
-  );
-  const zip = await JSZip.loadAsync(buffer);
-  const documentXml = await zip.file("word/document.xml").async("string");
+test("lists all delivery terms in the delivery conditions line", async () => {
+  for (const mode of ["formato1", "detail", "formato3"]) {
+    const buffer = await renderConfirmationDocx(
+      {
+        ...fakeConfirmation(),
+        deliveryTerms: "DDP",
+        items: [
+          {
+            ...fakeConfirmation().items[0],
+            number: 1,
+            deliveryPlace: "Puerto Bilbao",
+            deliveryTerms: "DDP Puerto Bilbao",
+            quantity: 80,
+            amount: 68800,
+            existences: []
+          },
+          {
+            ...fakeConfirmation().items[0],
+            number: 2,
+            deliveryPlace: "Almac\u00e9n Madrid",
+            deliveryTerms: "DDP Almac\u00e9n Madrid",
+            quantity: 120,
+            amount: 103200,
+            existences: []
+          }
+        ],
+        totalQuantity: 200,
+        hasSheetMaterial: mode === "formato3"
+      },
+      { mode }
+    );
+    const zip = await JSZip.loadAsync(buffer);
+    const documentXml = await zip.file("word/document.xml").async("string");
+    const text = extractDocumentText(documentXml);
 
-  assert.doesNotMatch(documentXml, /CONDICIONES DE ENTREGA:/);
-  assert.match(documentXml, /COND\. ENTREGA/);
-  assert.match(documentXml, /DDP Puerto Bilbao/);
-  assert.match(documentXml, /DDP Almacén Madrid/);
+    assert.match(
+      text,
+      /CONDICIONES DE ENTREGA: DDP Puerto Bilbao, DDP Almac\u00e9n Madrid/
+    );
+    assert.doesNotMatch(documentXml, /COND\. ENTREGA/);
+  }
 });
 
 test("adds bank details only when payment is transfer", async () => {
