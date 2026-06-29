@@ -108,7 +108,7 @@ function buildReplacements(
     ["ORIGEN: FABRICA Y PAÃS", originLine],
     [
       "CANTIDAD TOTAL: 600,000 MT (+ / - 10%)",
-      `CANTIDAD TOTAL: ${formatNumber(confirmation.totalQuantity, 3)} MT ${formatTolerance(confirmation)}`
+      formatTotalQuantityLine(confirmation, mode)
     ],
     [
       "CONDICIONES DE ENTREGA: INCOTERM DE LA VENTA",
@@ -168,6 +168,15 @@ function formatTolerance(confirmation) {
   if (!minus && !plus) return "";
   if (minus && plus && minus === plus) return `(+ / - ${plus})`;
   return `(- ${minus || "0%"} / + ${plus || "0%"})`;
+}
+
+function formatTotalQuantityLine(confirmation, mode) {
+  const base = `CANTIDAD TOTAL: ${formatNumber(confirmation.totalQuantity, 3)} MT`;
+  if (mode === "detail" || mode === "formato2" || mode === "formato3") {
+    return base;
+  }
+  const tolerance = formatTolerance(confirmation);
+  return tolerance ? `${base} ${tolerance}` : base;
 }
 
 function toPercent(value) {

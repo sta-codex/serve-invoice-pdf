@@ -79,6 +79,27 @@ test("formats quantities and money with thousands separators", async () => {
   assert.match(documentXml, /148\.148,14/);
 });
 
+test("shows total quantity tolerance only in grouped format", async () => {
+  const groupedBuffer = await renderConfirmationDocx(fakeConfirmation(), {
+    mode: "formato1"
+  });
+  const groupedDoc = await JSZip.loadAsync(groupedBuffer);
+  const groupedText = extractDocumentText(
+    await groupedDoc.file("word/document.xml").async("string")
+  );
+
+  assert.match(groupedText, /CANTIDAD TOTAL: 200,000 MT \(\+ \/ - 10%\)/);
+
+  for (const mode of ["detail", "formato2", "formato3"]) {
+    const buffer = await renderConfirmationDocx(fakeConfirmation(), { mode });
+    const doc = await JSZip.loadAsync(buffer);
+    const text = extractDocumentText(await doc.file("word/document.xml").async("string"));
+
+    assert.match(text, /CANTIDAD TOTAL: 200,000 MT/);
+    assert.doesNotMatch(text, /CANTIDAD TOTAL: 200,000 MT \(\+ \/ - 10%\)/);
+  }
+});
+
 test("keeps long customer header name in one right-aligned cell", async () => {
   const customerName = "Arcelormital Distribuci\u00f3n, S.L.";
   const buffer = await renderConfirmationDocx(
