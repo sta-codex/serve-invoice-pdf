@@ -620,6 +620,8 @@ function assertOnlyLabelBold(documentXml, label, valueStart) {
   assert.ok(valueRun, `${label} value should be in its own run`);
   assert.doesNotMatch(paragraphProperties, /<w:b\b/);
   assert.doesNotMatch(paragraphProperties, /<w:bCs\b/);
+  assert.match(paragraphProperties, /<w:ind\b[^>]*w:left="0"/);
+  assert.doesNotMatch(paragraphProperties, /<w:ind\b[^>]*w:left="-/);
   assert.match(labelRun.xml, /<w:b\/>/);
   assert.doesNotMatch(valueRun.xml, /<w:b\b/);
   assert.doesNotMatch(valueRun.xml, /<w:bCs\b/);

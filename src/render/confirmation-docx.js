@@ -586,10 +586,13 @@ function normalizeLabelValueBold(xml) {
     const value = text.slice(colonIndex + 1).replace(/^\s*/, " ");
     if (!shouldSplitLabelValueBold(label)) return paragraph;
 
-    return replaceParagraphRuns(paragraph, [
-      { text: label, bold: true },
-      { text: value, bold: false }
-    ]);
+    return setParagraphLeftIndent(
+      replaceParagraphRuns(paragraph, [
+        { text: label, bold: true },
+        { text: value, bold: false }
+      ]),
+      "0"
+    );
   });
 }
 
@@ -643,6 +646,23 @@ function removeParagraphBoldFromProperties(paragraph) {
   return paragraph.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/, (paragraphProperties) =>
     removeBoldFromRunProps(paragraphProperties)
   );
+}
+
+function setParagraphLeftIndent(paragraph, left) {
+  const indent = `<w:ind w:left="${left}"/>`;
+  if (paragraph.includes("<w:pPr>")) {
+    if (/<w:ind\b[^>]*\/>/.test(paragraph)) {
+      return paragraph.replace(/<w:ind\b[^>]*\/>/, (existingIndent) => {
+        if (/\bw:left="/.test(existingIndent)) {
+          return existingIndent.replace(/\bw:left="-?\d+"/, `w:left="${left}"`);
+        }
+        return existingIndent.replace(/\/>$/, ` w:left="${left}"/>`);
+      });
+    }
+    return paragraph.replace("</w:pPr>", `${indent}</w:pPr>`);
+  }
+
+  return paragraph.replace(/<w:p([^>]*)>/, `<w:p$1><w:pPr>${indent}</w:pPr>`);
 }
 
 function normalizeConfirmationTitleSpacing(xml) {
