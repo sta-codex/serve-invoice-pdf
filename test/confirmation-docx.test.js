@@ -409,6 +409,26 @@ test("uses final reclamaciones text", async () => {
   );
 });
 
+test("keeps legal common nouns in normal Spanish lowercase", async () => {
+  const buffer = await renderConfirmationDocx(fakeConfirmation(), { mode: "formato3" });
+  const doc = await JSZip.loadAsync(buffer);
+  const documentXml = await doc.file("word/document.xml").async("string");
+  const text = extractDocumentText(documentXml);
+
+  assert.match(text, /fuerza mayor/);
+  assert.match(text, /comprador/);
+  assert.match(text, /vendedor/);
+  assert.match(text, /bienes/);
+  assert.doesNotMatch(text, /\bFuerza Mayor\b/);
+  assert.doesNotMatch(text, /\bFuerza mayor\b/);
+  assert.doesNotMatch(text, /\bParte\b/);
+  assert.doesNotMatch(text, /\bPartes\b/);
+  assert.doesNotMatch(text, /\bAcuerdo\b/);
+  assert.doesNotMatch(text, /\bVendedor\b/);
+  assert.doesNotMatch(text, /\bComprador\b/);
+  assert.doesNotMatch(text, /\bBienes\b/);
+});
+
 test("removes any packing line in all formats", async () => {
   const modes = ["formato1", "formato2", "formato3"];
   for (const mode of modes) {
