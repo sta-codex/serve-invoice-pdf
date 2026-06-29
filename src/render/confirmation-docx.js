@@ -21,7 +21,7 @@ const BANK_DETAILS_TEXT = "DETALLES BANCARIOS: CAIXA BANK - ES40 2100 6428 2213 
 const FINAL_CONFIRMATION_TEXT =
   "Salvo comunicación expresa en contra por escrito dentro de las 24 horas siguientes a la recepción de esta confirmación, el pedido se dará por confirmado en todos sus términos.";
 const RECLAMACIONES_TEXT =
-  "RECLAMACIONES: Si se encuentran daños en las condiciones de los bienes, o hay alguna disputa sobre calidad/cantidad/peso, se debe enviar un reclamo, incluyendo fotografías, informe de inspección, descripción detallada del reclamo o problema, al vendedor después de la entrega con un máximo de 30 días después de la llegada de los Bienes a las instalaciones del cliente para defectos visibles y con un plazo de 45 para el resto de los defectos. Cualquier reclamo debe enviarse al vendedor por correo electrónico a al menos la siguiente dirección de correo electrónico: rfernandez@steeltradeadvisors.com.";
+  "RECLAMACIONES: Si se encuentran daños en las condiciones de los bienes, o hay alguna disputa sobre calidad/cantidad/peso, se debe enviar un reclamo, incluyendo fotografías, informe de inspección, descripción detallada del reclamo o problema, al vendedor después de la entrega con un máximo de 30 días después de la llegada de los Bienes a las instalaciones del cliente para defectos visibles y con un plazo de 45 para el resto de los defectos. Cualquier reclamo debe enviarse al vendedor por correo electrónico al menos a las siguientes direcciones de correo electrónico: rfernandez@steeltradeadvisors.com y icaymerich@steeltradeadvisors.com.";
 
 export async function renderConfirmationDocx(confirmation, { mode }) {
   const zip = await JSZip.loadAsync(readFileSync(TEMPLATE_URL));
@@ -68,6 +68,7 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
           xml = replaceSignatureBlockWithConfirmationNote(xml);
           xml = removePackingLine(xml);
           xml = removeBankDetails(xml, isTransferPaymentTerm(confirmation.paymentTerms));
+          xml = replaceDocumentCertificateLine(xml);
           xml = replaceReclamacionesLine(xml);
           xml = applyDocumentLayoutRules(xml);
         }
@@ -957,6 +958,20 @@ function removePackingLine(xml) {
   return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
     const text = paragraphText(paragraph);
     return shouldRemovePackingLine(text) ? "" : paragraph;
+  });
+}
+
+function replaceDocumentCertificateLine(xml) {
+  return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
+    const normalizedText = normalizeForMatch(paragraphText(paragraph))
+      .replace(/\s+/g, " ")
+      .trim();
+    const isOldCertificateLine =
+      normalizedText.includes("mill test certificado 3.1") &&
+      normalizedText.includes("en10204");
+    return isOldCertificateLine
+      ? replaceParagraphText(paragraph, "CERTIFICADO DE CALIDAD 3.1 DE ACUERDO A EN10204")
+      : paragraph;
   });
 }
 

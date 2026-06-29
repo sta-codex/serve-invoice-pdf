@@ -372,7 +372,7 @@ test("uses final reclamaciones text", async () => {
 
   assert.match(
     extractDocumentText(documentXml),
-    /RECLAMACIONES: Si se encuentran da\u00f1os en las condiciones de los bienes[\s\S]*rfernandez@steeltradeadvisors\.com\./
+    /RECLAMACIONES: Si se encuentran da\u00f1os en las condiciones de los bienes[\s\S]*al menos a las siguientes direcciones de correo electr\u00f3nico: rfernandez@steeltradeadvisors\.com y icaymerich@steeltradeadvisors\.com\./
   );
 });
 
@@ -406,14 +406,18 @@ test("always keeps fixed documentos lines in all formats", async () => {
     const packingIndex = paragraphs.findIndex((paragraph, index) =>
       index > documentosIndex && paragraph.includes("PACKING LIST")
     );
-    const millIndex = paragraphs.findIndex((paragraph, index) =>
-      index > documentosIndex && paragraph.includes("MILL TEST CERTIFICADO 3.1 ACORDE A")
+    const qualityCertificateIndex = paragraphs.findIndex((paragraph, index) =>
+      index > documentosIndex && paragraph.includes("CERTIFICADO DE CALIDAD 3.1 DE ACUERDO A EN10204")
     );
 
     assert.ok(documentosIndex > -1);
     assert.ok(facturaIndex > documentosIndex);
     assert.ok(packingIndex > facturaIndex);
-    assert.ok(millIndex > packingIndex);
+    assert.ok(qualityCertificateIndex > packingIndex);
+    assert.equal(
+      paragraphs.some((paragraph) => paragraph.includes("MILL TEST CERTIFICADO 3.1 ACORDE A")),
+      false
+    );
   }
 });
 
