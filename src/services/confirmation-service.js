@@ -68,6 +68,9 @@ const PURCHASE_CONTRACT_FIELD_IDS = ["fld0NoOFG9iFNVjQD"];
 const FACTORY_FIELD_IDS = ["fld6OzLLUSc1DwQt5", "fldEQlpy2q1X8C8sP"];
 const ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID = "fld1JHOdAMufJN8fM";
 const ITEM_VENTA_INCOTERM_VENTA_FIELD_ID = "fldcvIYj0HFL6IlEa";
+const DELIVERY_PLACE_TABLE_ID = "tblXhYWu2uQfbiPN7";
+const DELIVERY_PLACE_NAME_FIELD_ID = "fldhsacdoe0Y9z23n";
+const DELIVERY_PLACE_TYPE_FIELD_ID = "fldFykk49X29FAIPn";
 const CONFIRMATION_ITEM_VENTA_FIELD_IDS = [
   ...new Set([
     ...ITEM_VENTA_FIELD_IDS,
@@ -118,6 +121,10 @@ export async function loadConfirmationFromAirtable({ config, recordId }) {
     saleItemIds,
     CONFIRMATION_ITEM_VENTA_FIELD_IDS
   );
+  const deliveryPlaceIds = saleItemRecords.flatMap((record) =>
+    recordIds(fieldsOf(record)[ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID])
+  );
+  const deliveryPlacesById = await loadDeliveryPlacesById(client, deliveryPlaceIds);
 
   const purchaseItemIds = saleItemRecords.flatMap((record) =>
     recordIds(fieldsOf(record)[ITEM_VENTA.ITEM_COMPRA])
@@ -148,6 +155,7 @@ export async function loadConfirmationFromAirtable({ config, recordId }) {
   return normalizeConfirmation({
     record: contractRecord,
     saleItemRecords,
+    deliveryPlacesById,
     purchaseItemRecords,
     purchaseOriginByPurchaseItemId,
     existenceRecords,
@@ -159,6 +167,7 @@ export async function loadConfirmationFromAirtable({ config, recordId }) {
 function normalizeConfirmation({
   record,
   saleItemRecords,
+  deliveryPlacesById,
   purchaseItemRecords,
   purchaseOriginByPurchaseItemId,
   existenceRecords,
@@ -178,6 +187,7 @@ function normalizeConfirmation({
     .map((saleItemRecord) =>
       normalizeSaleItem({
         saleItemRecord,
+        deliveryPlacesById,
         purchaseItemsById,
         purchaseOriginByPurchaseItemId,
         existenceRecords: existencesBySaleItemId.get(saleItemRecord.id) || [],
@@ -234,6 +244,7 @@ function normalizeConfirmation({
 
 function normalizeSaleItem({
   saleItemRecord,
+  deliveryPlacesById,
   purchaseItemsById,
   purchaseOriginByPurchaseItemId,
   existenceRecords,
@@ -283,7 +294,13 @@ function normalizeSaleItem({
     linkedNames.materialTypes
   );
   const coilMinMax = summarizeCoilWeights(purchaseRecords);
-  const deliveryPlace = firstText(fields[ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID]);
+  const deliveryPlaceIds = recordIds(fields[ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID]);
+  const deliveryPlaces = deliveryPlaceIds
+    .map((id) => deliveryPlacesById.get(id))
+    .filter(Boolean);
+  const deliveryPlace =
+    deliveryPlaces.map((place) => place.name).filter(Boolean).join(" / ") ||
+    firstText(fields[ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID]);
   const itemDeliveryTerms = deliveryTermsWithPlace(
     normalizeDeliveryTerm(firstText(fields[ITEM_VENTA_INCOTERM_VENTA_FIELD_ID])) ||
       contractDeliveryTerms,
@@ -306,6 +323,7 @@ function normalizeSaleItem({
     purchaseItemName: firstText(primaryPurchaseFields[ITEM_COMPRA.ITEM]),
     deliveryPlace,
     deliveryTerms: itemDeliveryTerms,
+    hasStorageDeliveryPlace: deliveryPlaces.some(isClientStorageDeliveryPlace),
     origin: dedupe(
       purchaseItemIds
         .map((id) => purchaseOriginByPurchaseItemId.get(id))
@@ -387,6 +405,37 @@ function normalizeExistence(record, { fallbackSpecification, price }) {
     amount: roundMoney(quantity * existencePrice),
     units: numberValue(fields[EXISTENCIA.UDS]) || 1
   };
+}
+
+async function loadDeliveryPlacesById(client, deliveryPlaceIds) {
+  const uniqueIds = [...new Set(deliveryPlaceIds)].filter(Boolean);
+  if (!uniqueIds.length) return new Map();
+
+  const records = await client.listRecordsByIds(
+    DELIVERY_PLACE_TABLE_ID,
+    uniqueIds,
+    [DELIVERY_PLACE_NAME_FIELD_ID, DELIVERY_PLACE_TYPE_FIELD_ID]
+  );
+
+  return new Map(
+    records.map((record) => {
+      const fields = fieldsOf(record);
+      return [
+        record.id,
+        {
+          id: record.id,
+          name: firstText(fields[DELIVERY_PLACE_NAME_FIELD_ID]),
+          type: firstText(fields[DELIVERY_PLACE_TYPE_FIELD_ID])
+        }
+      ];
+    })
+  );
+}
+
+function isClientStorageDeliveryPlace(place) {
+  const type = normalizeText(place?.type);
+  const name = normalizeText(place?.name);
+  return type === "cliente" && (name.includes("puerto") || name.includes("almacen"));
 }
 
 async function loadPurchaseOriginByPurchaseItemId(client, purchaseItemRecords) {
@@ -478,6 +527,7 @@ export function getConfirmationLines(confirmation, mode) {
             origin: item.origin,
             deliveryPlace: item.deliveryPlace,
             deliveryTerms: item.deliveryTerms,
+            hasStorageDeliveryPlace: item.hasStorageDeliveryPlace,
             factoryId: "",
             minNet: item.minNet,
             maxNet: item.maxNet,
@@ -493,6 +543,7 @@ export function getConfirmationLines(confirmation, mode) {
         origin: item.origin,
         deliveryPlace: item.deliveryPlace,
         deliveryTerms: item.deliveryTerms,
+        hasStorageDeliveryPlace: item.hasStorageDeliveryPlace,
         factoryId: existence.factoryId,
         minNet: item.minNet,
         maxNet: item.maxNet,
@@ -509,6 +560,7 @@ export function getConfirmationLines(confirmation, mode) {
     origin: item.origin,
     deliveryPlace: item.deliveryPlace,
     deliveryTerms: item.deliveryTerms,
+    hasStorageDeliveryPlace: item.hasStorageDeliveryPlace,
     units: item.sheetUnits,
     minNet: item.minNet,
     maxNet: item.maxNet,

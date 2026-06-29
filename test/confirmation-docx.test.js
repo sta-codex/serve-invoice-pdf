@@ -211,7 +211,13 @@ test("keeps only labels bold in colon-separated paragraphs", async () => {
       ...fakeConfirmation(),
       origin: "Planta Madrid (ES / FR)",
       totalQuantity: 12345.678,
-      paymentTerms: "Carta de crédito a 30 días fecha factura"
+      paymentTerms: "Carta de crédito a 30 días fecha factura",
+      items: [
+        {
+          ...fakeConfirmation().items[0],
+          hasStorageDeliveryPlace: true
+        }
+      ]
     },
     { mode: "formato1" }
   );
@@ -434,7 +440,7 @@ test("replaces signature block with final confirmation paragraph", async () => {
   assert.doesNotMatch(documentXml, /TECHOS FALSTECH/);
 });
 
-test("shows storage line only for puerto or almacen delivery places with rate by material type", async () => {
+test("shows storage line only for eligible client delivery places with rate by material type", async () => {
   const modes = ["formato1", "formato2", "formato3"];
   for (const mode of modes) {
     const noStorageBuffer = await renderConfirmationDocx(
@@ -443,8 +449,9 @@ test("shows storage line only for puerto or almacen delivery places with rate by
         items: [
           {
             ...fakeConfirmation().items[0],
-            deliveryPlace: "Obra Madrid",
-            deliveryTerms: "CPT Obra Madrid"
+            deliveryPlace: "Puerto Madrid",
+            deliveryTerms: "CPT Puerto Madrid",
+            hasStorageDeliveryPlace: false
           }
         ]
       },
@@ -458,7 +465,13 @@ test("shows storage line only for puerto or almacen delivery places with rate by
     const coilBuffer = await renderConfirmationDocx(
       {
         ...fakeConfirmation(),
-        hasSheetMaterial: false
+        hasSheetMaterial: false,
+        items: [
+          {
+            ...fakeConfirmation().items[0],
+            hasStorageDeliveryPlace: true
+          }
+        ]
       },
       { mode }
     );
@@ -478,7 +491,13 @@ test("shows storage line only for puerto or almacen delivery places with rate by
     const sheetBuffer = await renderConfirmationDocx(
       {
         ...fakeConfirmation(),
-        hasSheetMaterial: true
+        hasSheetMaterial: true,
+        items: [
+          {
+            ...fakeConfirmation().items[0],
+            hasStorageDeliveryPlace: true
+          }
+        ]
       },
       { mode }
     );
@@ -502,7 +521,8 @@ test("shows storage line only for puerto or almacen delivery places with rate by
           {
             ...fakeConfirmation().items[0],
             deliveryPlace: "ALMACÉN Central",
-            deliveryTerms: "CPT ALMACÉN Central"
+            deliveryTerms: "CPT ALMACÉN Central",
+            hasStorageDeliveryPlace: true
           }
         ]
       },
@@ -541,6 +561,7 @@ function fakeConfirmation() {
         specification: "S235JR 2,00 x 1000 x 2000",
         deliveryPlace: "Puerto Madrid",
         deliveryTerms: "CPT Puerto Madrid",
+        hasStorageDeliveryPlace: false,
         sheetUnits: 50,
         quantity: 200,
         price: 860,

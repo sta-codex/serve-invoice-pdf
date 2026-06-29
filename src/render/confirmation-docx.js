@@ -911,12 +911,7 @@ function shrinkHeaderLogoRun(logoRun) {
 }
 
 function hasStorageDeliveryPlace(confirmation) {
-  return (confirmation.items || []).some((item) => {
-    const normalizedPlace = normalizeForMatch(item.deliveryPlace || "")
-      .replace(/\s+/g, " ")
-      .trim();
-    return normalizedPlace.includes("puerto") || normalizedPlace.includes("almacen");
-  });
+  return (confirmation.items || []).some((item) => item.hasStorageDeliveryPlace === true);
 }
 
 function updateStorageLine(xml, storageRate, showStorageLine) {
