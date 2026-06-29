@@ -66,8 +66,10 @@ const PURCHASE_CONTRACT_TABLE_ID = "tblzaz7hDLRRPVeEz";
 const FACTORY_TABLE_ID = "tblOCrtTa8WPxPDja";
 const PURCHASE_CONTRACT_FIELD_IDS = ["fld0NoOFG9iFNVjQD"];
 const FACTORY_FIELD_IDS = ["fld6OzLLUSc1DwQt5", "fldEQlpy2q1X8C8sP"];
+const CONTRATO_VENTA_NETO_BRUTO_CLIENTE_FIELD_ID = "fldPSd1OoL8LEHmMM";
 const ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID = "fld1JHOdAMufJN8fM";
 const ITEM_VENTA_INCOTERM_VENTA_FIELD_ID = "fldcvIYj0HFL6IlEa";
+const ITEM_VENTA_NETO_BRUTO_CLIENTE_FIELD_ID = "fldXSSM3nOKtANoHO";
 const DELIVERY_PLACE_TABLE_ID = "tblXhYWu2uQfbiPN7";
 const DELIVERY_PLACE_NAME_FIELD_ID = "fldhsacdoe0Y9z23n";
 const DELIVERY_PLACE_TYPE_FIELD_ID = "fldFykk49X29FAIPn";
@@ -75,7 +77,8 @@ const CONFIRMATION_ITEM_VENTA_FIELD_IDS = [
   ...new Set([
     ...ITEM_VENTA_FIELD_IDS,
     ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID,
-    ITEM_VENTA_INCOTERM_VENTA_FIELD_ID
+    ITEM_VENTA_INCOTERM_VENTA_FIELD_ID,
+    ITEM_VENTA_NETO_BRUTO_CLIENTE_FIELD_ID
   ])
 ];
 
@@ -182,6 +185,9 @@ function normalizeConfirmation({
   const contractDeliveryTerms = normalizeDeliveryTerm(
     linkedText(fields[CONTRATO_VENTA.INCOTERM], linkedNames.incoterms)
   );
+  const customerWeightMode = normalizeWeightMode(
+    firstText(fields[CONTRATO_VENTA_NETO_BRUTO_CLIENTE_FIELD_ID])
+  );
 
   const items = saleItemRecords
     .map((saleItemRecord) =>
@@ -192,7 +198,8 @@ function normalizeConfirmation({
         purchaseOriginByPurchaseItemId,
         existenceRecords: existencesBySaleItemId.get(saleItemRecord.id) || [],
         linkedNames,
-        contractDeliveryTerms
+        contractDeliveryTerms,
+        customerWeightMode
       })
     )
     .sort(compareItemNumber);
@@ -249,7 +256,8 @@ function normalizeSaleItem({
   purchaseOriginByPurchaseItemId,
   existenceRecords,
   linkedNames,
-  contractDeliveryTerms
+  contractDeliveryTerms,
+  customerWeightMode
 }) {
   const fields = fieldsOf(saleItemRecord);
   const purchaseItemIds = recordIds(fields[ITEM_VENTA.ITEM_COMPRA]);
@@ -282,12 +290,20 @@ function normalizeSaleItem({
       );
     }, 0)
   );
+  const itemCustomerWeightMode =
+    normalizeWeightMode(firstText(fields[ITEM_VENTA_NETO_BRUTO_CLIENTE_FIELD_ID])) ||
+    customerWeightMode ||
+    "neto";
+  const selectedLoadedQuantity = loadedQuantityByCustomerWeightMode(
+    fields,
+    itemCustomerWeightMode
+  );
   const quantity =
-    numberValue(fields[ITEM_VENTA.PESO_CONTRATO_BOBINAS]) ||
-    numberValue(fields[ITEM_VENTA.PESO_CARGADO]) ||
-    numberValue(fields[ITEM_VENTA.NETO_CARGADO]) ||
-    existenceQuantity ||
-    numberValue(primaryPurchaseFields[ITEM_COMPRA.NETO_CONTRATO]) ||
+    meaningfulQuantity(selectedLoadedQuantity) ??
+    meaningfulQuantity(numberValue(fields[ITEM_VENTA.PESO_CARGADO])) ??
+    meaningfulQuantity(numberValue(fields[ITEM_VENTA.PESO_CONTRATO_BOBINAS])) ??
+    (existenceQuantity || undefined) ??
+    meaningfulQuantity(numberValue(primaryPurchaseFields[ITEM_COMPRA.NETO_CONTRATO])) ??
     0;
   const materialType = linkedText(
     primaryPurchaseFields[ITEM_COMPRA.TIPO_MATERIAL],
@@ -575,6 +591,12 @@ export function isSheetType(value) {
   return normalized === "chapa" || normalized === "chapa grande";
 }
 
+export function loadedQuantityByCustomerWeightMode(fields, customerWeightMode) {
+  const mode = normalizeWeightMode(customerWeightMode) || "neto";
+  if (mode === "bruto") return numberValue(fields[ITEM_VENTA.BRUTO_CARGADO]);
+  return numberValue(fields[ITEM_VENTA.NETO_CARGADO]);
+}
+
 function groupExistencesBySaleItem(records) {
   const result = new Map();
   for (const record of records) {
@@ -685,6 +707,17 @@ function normalizeText(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
+}
+
+function normalizeWeightMode(value) {
+  const normalized = normalizeText(value);
+  if (normalized === "bruto") return "bruto";
+  if (normalized === "neto") return "neto";
+  return "";
+}
+
+function meaningfulQuantity(value) {
+  return value ? value : undefined;
 }
 
 function roundQuantity(value) {
