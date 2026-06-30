@@ -547,57 +547,39 @@ test("shows storage line only for eligible client delivery places with rate by m
 
     assert.equal(storageParagraph(noStorageXml), undefined);
 
-    const coilBuffer = await renderConfirmationDocx(
-      {
-        ...fakeConfirmation(),
-        hasSheetMaterial: false,
-        items: [
-          {
-            ...fakeConfirmation().items[0],
-            hasStorageDeliveryPlace: true
-          }
-        ]
-      },
-      { mode }
-    );
-    const coilDoc = await JSZip.loadAsync(coilBuffer);
-    const coilXml = await coilDoc.file("word/document.xml").async("string");
-    const coilStorageParagraph = storageParagraph(coilXml);
+    for (const scenario of [
+      { hasSheetMaterial: false, storageDeliveryKind: "almacen", rate: "0,15" },
+      { hasSheetMaterial: false, storageDeliveryKind: "puerto", rate: "0,30" },
+      { hasSheetMaterial: true, storageDeliveryKind: "almacen", rate: "0,20" },
+      { hasSheetMaterial: true, storageDeliveryKind: "puerto", rate: "0,25" }
+    ]) {
+      const storageBuffer = await renderConfirmationDocx(
+        {
+          ...fakeConfirmation(),
+          hasSheetMaterial: scenario.hasSheetMaterial,
+          items: [
+            {
+              ...fakeConfirmation().items[0],
+              hasStorageDeliveryPlace: true,
+              storageDeliveryKind: scenario.storageDeliveryKind
+            }
+          ]
+        },
+        { mode }
+      );
+      const storageDoc = await JSZip.loadAsync(storageBuffer);
+      const storageXml = await storageDoc.file("word/document.xml").async("string");
+      const storageLine = storageParagraph(storageXml);
 
-    assert.ok(coilStorageParagraph, `ALMACENAJES line should be present in ${mode} for coil orders`);
-    assert.equal(
-      extractParagraphText(coilStorageParagraph),
-      "ALMACENAJES: 30 DÍAS LIBRES A PARTIR DE LA FECHA FACTURA, TRANSCURRIDO ESE PERIODO, SE FACTURARÁ A 0,15 €/MT POR DÍA."
-    );
-    assert.doesNotMatch(coilStorageParagraph, /w:color w:val="EE0000"/);
-    assert.match(coilStorageParagraph, /w:color w:val="000000"/);
-    assert.doesNotMatch(coilXml, /PARA LA BOBINA|PARA LA CHAPA/);
-
-    const sheetBuffer = await renderConfirmationDocx(
-      {
-        ...fakeConfirmation(),
-        hasSheetMaterial: true,
-        items: [
-          {
-            ...fakeConfirmation().items[0],
-            hasStorageDeliveryPlace: true
-          }
-        ]
-      },
-      { mode }
-    );
-    const sheetDoc = await JSZip.loadAsync(sheetBuffer);
-    const sheetXml = await sheetDoc.file("word/document.xml").async("string");
-    const sheetStorageParagraph = storageParagraph(sheetXml);
-
-    assert.ok(sheetStorageParagraph, `ALMACENAJES line should be present in ${mode} for sheet orders`);
-    assert.equal(
-      extractParagraphText(sheetStorageParagraph),
-      "ALMACENAJES: 30 DÍAS LIBRES A PARTIR DE LA FECHA FACTURA, TRANSCURRIDO ESE PERIODO, SE FACTURARÁ A 0,22 €/MT POR DÍA."
-    );
-    assert.doesNotMatch(sheetStorageParagraph, /w:color w:val="EE0000"/);
-    assert.match(sheetStorageParagraph, /w:color w:val="000000"/);
-    assert.doesNotMatch(sheetXml, /PARA LA BOBINA|PARA LA CHAPA/);
+      assert.ok(storageLine, `ALMACENAJES line should be present in ${mode}`);
+      assert.equal(
+        extractParagraphText(storageLine),
+        `ALMACENAJES: 30 DÍAS LIBRES A PARTIR DE LA FECHA FACTURA, TRANSCURRIDO ESE PERIODO, SE FACTURARÁ A ${scenario.rate} €/MT POR DÍA.`
+      );
+      assert.doesNotMatch(storageLine, /w:color w:val="EE0000"/);
+      assert.match(storageLine, /w:color w:val="000000"/);
+      assert.doesNotMatch(storageXml, /PARA LA BOBINA|PARA LA CHAPA/);
+    }
 
     const accentedStorageBuffer = await renderConfirmationDocx(
       {

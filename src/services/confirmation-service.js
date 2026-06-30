@@ -318,6 +318,7 @@ function normalizeSaleItem({
   const deliveryPlace =
     deliveryPlaces.map((place) => place.name).filter(Boolean).join(" / ") ||
     firstText(fields[ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID]);
+  const storageDeliveryKind = storageDeliveryKindFromPlaces(deliveryPlaces);
   const itemDeliveryTerms = deliveryTermsWithPlace(
     normalizeDeliveryTerm(firstText(fields[ITEM_VENTA_INCOTERM_VENTA_FIELD_ID])) ||
       contractDeliveryTerms,
@@ -340,7 +341,8 @@ function normalizeSaleItem({
     purchaseItemName: firstText(primaryPurchaseFields[ITEM_COMPRA.ITEM]),
     deliveryPlace,
     deliveryTerms: itemDeliveryTerms,
-    hasStorageDeliveryPlace: deliveryPlaces.some(isClientStorageDeliveryPlace),
+    hasStorageDeliveryPlace: Boolean(storageDeliveryKind),
+    storageDeliveryKind,
     origin: dedupe(
       purchaseItemIds
         .map((id) => purchaseOriginByPurchaseItemId.get(id))
@@ -455,6 +457,15 @@ function isClientStorageDeliveryPlace(place) {
   return type === "cliente" && (name.includes("puerto") || name.includes("almacen"));
 }
 
+function storageDeliveryKindFromPlaces(places) {
+  const eligibleNames = places
+    .filter(isClientStorageDeliveryPlace)
+    .map((place) => normalizeText(place?.name));
+  if (eligibleNames.some((name) => name.includes("puerto"))) return "puerto";
+  if (eligibleNames.some((name) => name.includes("almacen"))) return "almacen";
+  return "";
+}
+
 async function loadPurchaseOriginByPurchaseItemId(client, purchaseItemRecords) {
   const purchaseItemToContractIds = new Map();
   const purchaseContractIds = [
@@ -545,6 +556,7 @@ export function getConfirmationLines(confirmation, mode) {
             deliveryPlace: item.deliveryPlace,
             deliveryTerms: item.deliveryTerms,
             hasStorageDeliveryPlace: item.hasStorageDeliveryPlace,
+            storageDeliveryKind: item.storageDeliveryKind,
             factoryId: "",
             minNet: item.minNet,
             maxNet: item.maxNet,
@@ -561,6 +573,7 @@ export function getConfirmationLines(confirmation, mode) {
         deliveryPlace: item.deliveryPlace,
         deliveryTerms: item.deliveryTerms,
         hasStorageDeliveryPlace: item.hasStorageDeliveryPlace,
+        storageDeliveryKind: item.storageDeliveryKind,
         factoryId: existence.factoryId,
         minNet: item.minNet,
         maxNet: item.maxNet,
@@ -578,6 +591,7 @@ export function getConfirmationLines(confirmation, mode) {
     deliveryPlace: item.deliveryPlace,
     deliveryTerms: item.deliveryTerms,
     hasStorageDeliveryPlace: item.hasStorageDeliveryPlace,
+    storageDeliveryKind: item.storageDeliveryKind,
     units: item.sheetUnits,
     minNet: item.minNet,
     maxNet: item.maxNet,

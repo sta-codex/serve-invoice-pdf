@@ -52,13 +52,12 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
         if (name === "word/document.xml") {
           xml = replaceCustomerHeaderBlock(xml, confirmation);
           xml = insertTableAfterMaterialIntro(xml, merchandiseTable);
-          const storageRate = confirmation.hasSheetMaterial ? "0,22" : "0,15";
           if (hasMultipleOrigins) {
             xml = removeOriginLine(xml);
           } else {
             xml = replaceOriginLine(xml, `ORIGEN: ${origin}`);
           }
-          xml = updateStorageLine(xml, storageRate, hasStorageDeliveryPlace(confirmation));
+          xml = updateStorageLine(xml, getStorageRate(confirmation));
           xml = replaceSignatureBlockWithConfirmationNote(xml);
           xml = removePackingLine(xml);
           xml = removeBankDetails(xml, isTransferPaymentTerm(confirmation.paymentTerms));
@@ -924,11 +923,35 @@ function shrinkHeaderLogoRun(logoRun) {
     .replace(/<a:ext cx="\d+" cy="\d+"\/>/, `<a:ext cx="${widthCx}" cy="${heightCy}"/>`);
 }
 
-function hasStorageDeliveryPlace(confirmation) {
-  return (confirmation.items || []).some((item) => item.hasStorageDeliveryPlace === true);
+function getStorageRate(confirmation) {
+  const kind = getStorageDeliveryKind(confirmation);
+  if (!kind) return "";
+  if (confirmation.hasSheetMaterial) {
+    return kind === "puerto" ? "0,25" : "0,20";
+  }
+  return kind === "puerto" ? "0,30" : "0,15";
 }
 
-function updateStorageLine(xml, storageRate, showStorageLine) {
+function getStorageDeliveryKind(confirmation) {
+  const eligibleItems = (confirmation.items || []).filter(
+    (item) => item.hasStorageDeliveryPlace === true
+  );
+  const kinds = eligibleItems.map((item) =>
+    normalizeStorageDeliveryKind(item.storageDeliveryKind || item.deliveryPlace)
+  );
+  if (kinds.includes("puerto")) return "puerto";
+  if (kinds.includes("almacen")) return "almacen";
+  return "";
+}
+
+function normalizeStorageDeliveryKind(value) {
+  const normalized = normalizeForMatch(value);
+  if (normalized.includes("puerto")) return "puerto";
+  if (normalized.includes("almacen")) return "almacen";
+  return "";
+}
+
+function updateStorageLine(xml, storageRate) {
   const storageText =
     `ALMACENAJES: 30 DÍAS LIBRES A PARTIR DE LA FECHA FACTURA, TRANSCURRIDO ESE PERIODO, SE FACTURARÁ A ${storageRate} €/MT POR DÍA.`;
   return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
@@ -943,7 +966,7 @@ function updateStorageLine(xml, storageRate, showStorageLine) {
       (normalizedText.includes("se facturar") && normalizedText.includes("eur/mt"));
 
     if (!isStorageParagraph) return paragraph;
-    if (!showStorageLine) return "";
+    if (!storageRate) return "";
     return replaceParagraphText(
       paragraph,
       storageText
