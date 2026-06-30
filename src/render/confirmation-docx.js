@@ -565,13 +565,16 @@ function normalizeLabelValueBold(xml) {
     const value = text.slice(colonIndex + 1).replace(/^\s*/, " ");
     if (!shouldSplitLabelValueBold(label)) return paragraph;
 
-    return setParagraphLeftIndent(
+    const labelValueParagraph = setParagraphLeftIndent(
       replaceParagraphRuns(paragraph, [
         { text: label, bold: true },
         { text: value, bold: false }
       ]),
       "0"
     );
+    return shouldUseBodyLabelLayout(label)
+      ? setBodyLabelParagraphLayout(labelValueParagraph)
+      : labelValueParagraph;
   });
 }
 
@@ -581,6 +584,35 @@ function shouldSplitLabelValueBold(label) {
     .replace(/\s+/g, " ")
     .trim();
   return LABEL_VALUE_PREFIXES.includes(normalizedLabel);
+}
+
+function shouldUseBodyLabelLayout(label) {
+  const normalizedLabel = normalizeForMatch(label)
+    .replace(/\s*:\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return ["condiciones de entrega", "condiciones de pago"].includes(normalizedLabel);
+}
+
+function setBodyLabelParagraphLayout(paragraph) {
+  const style = '<w:pStyle w:val="Textoindependiente"/>';
+  const spacing = '<w:spacing w:line="220" w:lineRule="atLeast"/>';
+  let result = paragraph;
+
+  if (/<w:pPr>[\s\S]*?<\/w:pPr>/.test(result)) {
+    result = result.replace(/<w:pStyle\b[^>]*\/>/, style);
+    if (!result.includes(style)) {
+      result = result.replace("<w:pPr>", `<w:pPr>${style}`);
+    }
+
+    result = result.replace(/<w:spacing\b[^>]*\/>/, spacing);
+    if (!result.includes(spacing)) {
+      result = result.replace("</w:pPr>", `${spacing}</w:pPr>`);
+    }
+    return result;
+  }
+
+  return result.replace(/<w:p([^>]*)>/, `<w:p$1><w:pPr>${style}${spacing}</w:pPr>`);
 }
 
 function replaceParagraphRuns(paragraph, runs) {

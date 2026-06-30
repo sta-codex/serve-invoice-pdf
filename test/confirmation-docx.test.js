@@ -279,6 +279,8 @@ test("keeps only labels bold in colon-separated paragraphs", async () => {
   assertOnlyLabelBold(documentXml, "CANTIDAD TOTAL:", "12.345,678 MT");
   assertOnlyLabelBold(documentXml, "CONDICIONES DE ENTREGA:", "CPT Puerto Madrid");
   assertOnlyLabelBold(documentXml, "CONDICIONES DE PAGO:", "Carta de crédito a 30 días fecha factura");
+  assertBodyLabelLayout(documentXml, "CONDICIONES DE ENTREGA:");
+  assertBodyLabelLayout(documentXml, "CONDICIONES DE PAGO:");
   assertOnlyLabelBold(documentXml, "ALMACENAJES:", "30 DÍAS LIBRES");
   assertOnlyLabelBold(documentXml, "RECLAMACIONES:", "Si se encuentran daños");
 });
@@ -682,6 +684,18 @@ function assertOnlyLabelBold(documentXml, label, valueStart) {
   assert.match(labelRun.xml, /<w:b\/>/);
   assert.doesNotMatch(valueRun.xml, /<w:b\b/);
   assert.doesNotMatch(valueRun.xml, /<w:bCs\b/);
+}
+
+function assertBodyLabelLayout(documentXml, label) {
+  const paragraph = [...documentXml.matchAll(/<w:p[\s\S]*?<\/w:p>/g)]
+    .map((match) => match[0])
+    .find((candidate) => extractParagraphText(candidate).startsWith(label));
+  assert.ok(paragraph, `${label} paragraph should exist`);
+
+  const paragraphProperties = paragraph.match(/<w:pPr>[\s\S]*?<\/w:pPr>/)?.[0] || "";
+  assert.match(paragraphProperties, /<w:pStyle w:val="Textoindependiente"\/>/);
+  assert.match(paragraphProperties, /<w:spacing w:line="220" w:lineRule="atLeast"\/>/);
+  assert.match(paragraphProperties, /<w:ind\b[^>]*w:left="0"/);
 }
 
 function textRuns(paragraph) {
