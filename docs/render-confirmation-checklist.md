@@ -22,9 +22,13 @@ Do not rely on `origin` for production confirmation-document changes unless Rend
 7. Push to `sta-codex HEAD:main`.
 8. Re-download the DOCX from `https://steel-trade-invoice-service.onrender.com/api/confirmations/...` with a fresh cache-busting `v=` query parameter.
 9. Confirm the downloaded production DOCX contains the requested visible text/layout.
+10. When the user is validating through the Airtable button, inspect the actual `Contratos de venta.Documentos confirmacion` attachment saved by Airtable after the button run.
+11. Download that Airtable attachment URL and confirm its DOCX content contains the requested visible text/layout.
 
 ## Done means
 
 Do not say "hecho", "subido", or "ya esta" until the Render-served DOCX, not just local code or GitHub, has been checked after the push.
+
+If the user says the Airtable button still shows old output, Render verification is not enough. The done check must be the DOCX attachment that Airtable actually saved in `Documentos confirmacion`.
 
 For Airtable button behavior, the expected final check is: if Lucas presses `Crear confirmacion`, the attachment added to `Documentos confirmacion` should match the Render-served DOCX verified above.
