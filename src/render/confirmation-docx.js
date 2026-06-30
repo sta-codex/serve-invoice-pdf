@@ -316,11 +316,11 @@ function buildLineRow(
 function buildSummaryRows(lines, subtotal, vat, total, columnCount) {
   const quantityColSpan = columnCount - 3;
   const vatColSpan = columnCount - 1;
-  const totalSpan = columnCount;
+  const totalLabelPrefixSpan = columnCount - 2;
   return [
     [cell("", { span: quantityColSpan }), cell(formatNumber(sum(lines, "quantity"), 3), { align: "right", bold: true }), cell(""), cell(formatMoney(subtotal), { align: "right", bold: true })],
     [cell("IVA 21%", { span: vatColSpan, align: "right", bold: true }), cell(formatMoney(vat), { align: "right", bold: true })],
-    [cell("TOTAL", { span: totalSpan - 1, align: "right", bold: true, shade: "EDEDED" }), cell(formatMoney(total), { align: "right", bold: true, shade: "EDEDED" })]
+    [cell("", { span: totalLabelPrefixSpan, shade: "EDEDED" }), cell("TOTAL", { align: "right", bold: true, shade: "EDEDED" }), cell(formatMoney(total), { align: "right", bold: true, shade: "EDEDED" })]
   ];
 }
 
@@ -867,6 +867,15 @@ function buildCustomerHeaderTable({
     '<w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/></w:pPr>',
     "</w:p>"
   ].join("");
+  const customerBlankLine = [
+    "<w:p>",
+    '<w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"/><w:jc w:val="right"/></w:pPr>',
+    "<w:r>",
+    '<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr>',
+    '<w:t xml:space="preserve"></w:t>',
+    "</w:r>",
+    "</w:p>"
+  ].join("");
   const rightParagraphs = [
     customerTopSpacer,
     textParagraph(customerName, {
@@ -877,7 +886,8 @@ function buildCustomerHeaderTable({
     }),
     textParagraph(customerAddressText),
     textParagraph(customerTaxId),
-    textParagraph(confirmationDate, { spacingBefore: "240" })
+    customerBlankLine,
+    textParagraph(confirmationDate)
   ].join("");
 
   return [

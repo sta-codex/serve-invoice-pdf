@@ -92,7 +92,8 @@ test("labels the final merchandise table row as total", async () => {
   const lastRowCells = [...rows.at(-1).matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)]
     .map((match) => extractParagraphText(match[0]));
 
-  assert.deepEqual(lastRowCells, ["TOTAL", "208.120,00"]);
+  assert.equal(lastRowCells.at(-2), "TOTAL");
+  assert.equal(lastRowCells.at(-1), "208.120,00");
 });
 
 test("shows total quantity tolerance only in grouped format", async () => {
@@ -171,10 +172,11 @@ test("keeps long customer header name in one right-aligned cell", async () => {
     );
     assert.match(headerTable, /<w:noWrap\/>/);
     assert.match(nameParagraphs[0], /<w:jc w:val="right"\/>/);
-    assert.equal(dateParagraphIndex, taxIdParagraphIndex + 1);
+    assert.equal(dateParagraphIndex, taxIdParagraphIndex + 2);
+    assert.equal(extractParagraphText(headerParagraphs[taxIdParagraphIndex + 1]), "");
     assert.match(
-      headerParagraphs[dateParagraphIndex],
-      /<w:spacing w:before="240" w:after="0"\/>/
+      headerParagraphs[taxIdParagraphIndex + 1],
+      /<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="exact"\/>/
     );
   }
 });
