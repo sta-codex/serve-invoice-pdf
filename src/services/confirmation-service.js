@@ -451,18 +451,12 @@ async function loadDeliveryPlacesById(client, deliveryPlaceIds) {
   );
 }
 
-function isClientStorageDeliveryPlace(place) {
-  const type = normalizeText(place?.type);
-  const name = normalizeText(place?.name);
-  return type === "cliente" && (name.includes("puerto") || name.includes("almacen"));
-}
-
-function storageDeliveryKindFromPlaces(places) {
-  const eligibleNames = places
-    .filter(isClientStorageDeliveryPlace)
-    .map((place) => normalizeText(place?.name));
-  if (eligibleNames.some((name) => name.includes("puerto"))) return "puerto";
-  if (eligibleNames.some((name) => name.includes("almacen"))) return "almacen";
+export function storageDeliveryKindFromPlaces(places) {
+  const eligibleTypes = places
+    .map((place) => normalizeText(place?.type))
+    .filter((type) => type === "ddp puerto" || type === "ddp almacen");
+  if (eligibleTypes.includes("ddp puerto")) return "puerto";
+  if (eligibleTypes.includes("ddp almacen")) return "almacen";
   return "";
 }
 
