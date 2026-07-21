@@ -2,17 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   CARRIER_DETAILS_LABEL,
+  FACTORY_ID_LABEL,
   formatOwnDeliveryNoteDate,
   LICENSE_PLATE_LABEL,
   ownDeliveryNoteTaxId,
   OWN_DELIVERY_NOTE_LABEL,
-  renderOwnDeliveryNotePdf
+  renderOwnDeliveryNotePdf,
+  TOTAL_LABEL,
+  totalWeight
 } from "../src/render/own-delivery-note-pdf.js";
 
 test("uses English labels throughout the delivery note template", () => {
   assert.equal(OWN_DELIVERY_NOTE_LABEL, "DELIVERY NOTE:");
+  assert.equal(FACTORY_ID_LABEL, "Factory ID");
+  assert.equal(TOTAL_LABEL, "TOTAL");
   assert.equal(CARRIER_DETAILS_LABEL, "CARRIER DETAILS");
   assert.equal(LICENSE_PLATE_LABEL, "License plate:");
+});
+
+test("adds the weights shown in the table", () => {
+  assert.equal(totalWeight([{ weight: 7.126 }, { weight: 6.926 }, { weight: 3.396 }]), 17.448);
 });
 
 test("keeps dates in Spanish day-month-year format", () => {
@@ -49,7 +58,7 @@ test("renders an own delivery note as a PDF", async () => {
     },
     materialHeadings: ["PREPAINTED GALVANIZED STEEL COILS"],
     lines: [
-      { description: "Steel coil", coilNumber: "COIL-1", weight: 12.345 }
+      { description: "Steel coil", factoryId: "TNMM2504260107-12", weight: 12.345 }
     ]
   });
 

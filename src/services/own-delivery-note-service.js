@@ -8,8 +8,7 @@ const MATERIAL_TABLE = "tbldcH54bb4nIP2Ts";
 const MATERIAL = { CODE:"fldpB4YiAn2w8w70I", NAME:"fldDclRe2H0kqZw48", TYPE:"fld9l2c0MW70BKlzb" };
 const MATERIAL_TYPE_TABLE = "tblVYEUxcX8xtyUsv";
 const MATERIAL_TYPE = { NAME:"fldYe0hoT3OWTfwA1" };
-const COIL_NUMBER = "fldQANgNRiprhR8Hi";
-const STOCK_FIELDS = [EXISTENCIA.DESCRIPCION, COIL_NUMBER, EXISTENCIA.NETO, EXISTENCIA.BRUTO, EXISTENCIA.PESO_FACTURA, EXISTENCIA.ITEM_VENTA, EXISTENCIA.MATERIAL];
+const STOCK_FIELDS = [EXISTENCIA.DESCRIPCION, EXISTENCIA.ID_FABRICA, EXISTENCIA.NETO, EXISTENCIA.BRUTO, EXISTENCIA.PESO_FACTURA, EXISTENCIA.ITEM_VENTA, EXISTENCIA.MATERIAL];
 const SALE_FIELDS = [ITEM_VENTA.CONTRATO];
 const CONTRACT_FIELDS = [CONTRATO_VENTA.CLIENTE];
 const CUSTOMER_FIELDS = Object.values(CLIENTE);
@@ -53,7 +52,7 @@ export async function loadOwnDeliveryNote({ config, recordId, ownId }) {
   const stock = await client.listRecordsByIds(config.airtable.tables.existencias, group.stockIds, STOCK_FIELDS);
   const materialHeadings = await materialHeadingsForStock({ client, stock });
   const fields = fieldsOf(note);
-  return { id: ownId, date: textValue(fields[ALBARAN.CARGA]), plate: textValue(fields[ALBARAN.MATRICULA]), customer: group.customer, company: config.company, materialHeadings, lines: stock.map(record => { const f=fieldsOf(record); return { description:textValue(f[EXISTENCIA.DESCRIPCION]) || record.id, coilNumber:textValue(f[COIL_NUMBER]), weight: number(f[EXISTENCIA.PESO_FACTURA]) || number(f[EXISTENCIA.NETO]) || number(f[EXISTENCIA.BRUTO]) || 0 }; }) };
+  return { id: ownId, date: textValue(fields[ALBARAN.CARGA]), plate: textValue(fields[ALBARAN.MATRICULA]), customer: group.customer, company: config.company, materialHeadings, lines: stock.map(record => { const f=fieldsOf(record); return { description:textValue(f[EXISTENCIA.DESCRIPCION]) || record.id, factoryId:textValue(f[EXISTENCIA.ID_FABRICA]), weight: number(f[EXISTENCIA.PESO_FACTURA]) || number(f[EXISTENCIA.NETO]) || number(f[EXISTENCIA.BRUTO]) || 0 }; }) };
 }
 
 async function materialHeadingsForStock({ client, stock }) {
