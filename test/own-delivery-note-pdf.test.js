@@ -4,6 +4,7 @@ import {
   CARRIER_DETAILS_LABEL,
   formatOwnDeliveryNoteDate,
   LICENSE_PLATE_LABEL,
+  ownDeliveryNoteTaxId,
   OWN_DELIVERY_NOTE_LABEL,
   renderOwnDeliveryNotePdf
 } from "../src/render/own-delivery-note-pdf.js";
@@ -18,6 +19,11 @@ test("keeps dates in Spanish day-month-year format", () => {
   assert.equal(formatOwnDeliveryNoteDate("2026-06-29"), "29/06/2026");
 });
 
+test("shows both tax IDs without a CIF prefix", () => {
+  assert.equal(ownDeliveryNoteTaxId("CIF: B88047790"), "B88047790");
+  assert.equal(ownDeliveryNoteTaxId("B06736391"), "B06736391");
+});
+
 test("renders an own delivery note as a PDF", async () => {
   const pdf = await renderOwnDeliveryNotePdf({
     id: "STA-2026-2906A",
@@ -29,7 +35,7 @@ test("renders an own delivery note as a PDF", async () => {
       address: "Address",
       city: "City",
       phone: "+34 000 000 000",
-      taxId: "B00000000"
+      taxId: "CIF: B00000000"
     },
     customer: {
       commercialName: "Customer",
