@@ -37,7 +37,9 @@ that the service is linked to `main` and that the deployed commit matches
 5. Confirm `git ls-remote sta-codex refs/heads/main` returns that commit.
 6. Wait for Render's automatic deployment and verify the same commit appears
    in the Render event.
-7. Verify `/health` and the changed functional endpoint on the public URL.
+7. Verify `/health` and the changed functional endpoint on the public URL,
+   using a known real Airtable record. A fake record only proves route wiring
+   and does not detect stale or mistyped Airtable field IDs.
 8. If Airtable stores an attachment, run the Airtable button and inspect the
    attachment that Airtable actually saved.
 
