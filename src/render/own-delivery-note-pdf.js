@@ -3,6 +3,13 @@ import { formatNumber } from "../domain/format.js";
 import { formatDateEs } from "../domain/values.js";
 
 const PAGE = { width: 595.28, height: 841.89, margin: 50 };
+export const OWN_DELIVERY_NOTE_LABEL = "DELIVERY NOTE:";
+export const CARRIER_DETAILS_LABEL = "CARRIER DETAILS";
+export const LICENSE_PLATE_LABEL = "License plate:";
+
+export function formatOwnDeliveryNoteDate(value) {
+  return formatDateEs(value);
+}
 
 export async function renderOwnDeliveryNotePdf(note) {
   const doc = new PDFDocument({ size: "A4", margins: { top: 44, bottom: 36, left: PAGE.margin, right: PAGE.margin }, bufferPages: true });
@@ -11,9 +18,9 @@ export async function renderOwnDeliveryNotePdf(note) {
   let y = 170;
   y = drawTable(doc, note.lines, y);
   y += 24;
-  doc.font("Helvetica-Bold").fontSize(9).text("DATOS DEL TRANSPORTISTA", PAGE.margin, y);
+  doc.font("Helvetica-Bold").fontSize(9).text(CARRIER_DETAILS_LABEL, PAGE.margin, y);
   y += 16;
-  doc.font("Helvetica").fontSize(9).text(`Matrícula: ${note.plate || "-"}`, PAGE.margin, y);
+  doc.font("Helvetica").fontSize(9).text(`${LICENSE_PLATE_LABEL} ${note.plate || "-"}`, PAGE.margin, y);
   doc.end();
   return done;
 }
@@ -28,8 +35,8 @@ function drawHeader(doc, note) {
   doc.font("Helvetica-Bold").text(c.fiscalName || c.commercialName || "", 335, 76, { width: 210 });
   doc.font("Helvetica").text(c.address || "", 335, 91, { width: 210 });
   doc.text([c.postalCode, c.city, c.province, c.country].filter(Boolean).join(" "), 335, 106, { width: 210 }); doc.text(c.taxId || "", 335, 121, { width: 210 });
-  doc.font("Helvetica-Bold").fontSize(9).text(`ALBARÁN PROPIO: ${note.id}`, PAGE.margin, 145);
-  doc.font("Helvetica").text(formatDateEs(note.date), 470, 145, { width: 75, align: "right" });
+  doc.font("Helvetica-Bold").fontSize(9).text(`${OWN_DELIVERY_NOTE_LABEL} ${note.id}`, PAGE.margin, 145);
+  doc.font("Helvetica").text(formatOwnDeliveryNoteDate(note.date), 470, 145, { width: 75, align: "right" });
 }
 
 function drawTable(doc, lines, y) {
