@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { allocateOwnIdsForDate } from "../src/services/own-delivery-note-service.js";
+import {
+  allocateOwnIdsForDate,
+  formatMaterialHeading
+} from "../src/services/own-delivery-note-service.js";
 
 const DATE = "2026-06-29";
 const FIELD = "fldqxidJFKKnpLFiv";
@@ -53,6 +56,21 @@ test("allocates one unique ID per customer while skipping occupied IDs", () => {
     records: [record("one", "STA-2026-2906A"), record("two", "STA-2026-2906C")],
     count: 3
   }), ["STA-2026-2906B", "STA-2026-2906D", "STA-2026-2906E"]);
+});
+
+test("builds the long English material heading from Airtable material data", () => {
+  assert.equal(
+    formatMaterialHeading("Cold Rolled Steel", "Bobina"),
+    "COLD ROLLED STEEL COILS"
+  );
+  assert.equal(
+    formatMaterialHeading("Prepainted Galvanized Steel", "Bobina"),
+    "PREPAINTED GALVANIZED STEEL COILS"
+  );
+  assert.equal(
+    formatMaterialHeading("Hot Rolled Plates", "Chapa"),
+    "HOT ROLLED PLATES"
+  );
 });
 
 function allocate(overrides) {

@@ -20,6 +20,7 @@ export async function renderOwnDeliveryNotePdf(note) {
   const done = collect(doc);
   drawHeader(doc, note);
   let y = 170;
+  y = drawMaterialHeadings(doc, note.materialHeadings, y);
   y = drawTable(doc, note.lines, y);
   y += 24;
   doc.font("Helvetica-Bold").fontSize(9).text(CARRIER_DETAILS_LABEL, PAGE.margin, y);
@@ -27,6 +28,18 @@ export async function renderOwnDeliveryNotePdf(note) {
   doc.font("Helvetica").fontSize(9).text(`${LICENSE_PLATE_LABEL} ${note.plate || "-"}`, PAGE.margin, y);
   doc.end();
   return done;
+}
+
+function drawMaterialHeadings(doc, headings, y) {
+  const values = Array.isArray(headings) ? headings.filter(Boolean) : [];
+  if (!values.length) return y;
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("#111111");
+  for (const heading of values) {
+    const height = doc.heightOfString(heading, { width: PAGE.width - PAGE.margin * 2 });
+    doc.text(heading, PAGE.margin, y, { width: PAGE.width - PAGE.margin * 2 });
+    y += height + 5;
+  }
+  return y + 8;
 }
 
 function drawHeader(doc, note) {

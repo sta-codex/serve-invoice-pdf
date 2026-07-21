@@ -47,6 +47,7 @@ test("renders an own delivery note as a PDF", async () => {
       country: "Spain",
       taxId: "B11111111"
     },
+    materialHeadings: ["PREPAINTED GALVANIZED STEEL COILS"],
     lines: [
       { description: "Steel coil", coilNumber: "COIL-1", weight: 12.345 }
     ]

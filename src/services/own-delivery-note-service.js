@@ -4,8 +4,12 @@ import { fieldsOf, recordIds, textValue } from "../domain/values.js";
 
 const ALBARAN = { CARGA:"fldphpQv8LKwpAMOI", MATRICULA:"fld4334sjMHctSjz5", EXISTENCIAS:"fldScPqK214RzAQSW", ALBARAN_PROPIO_ID:"fldqxidJFKKnpLFiv", ALBARAN_PROPIO_PDF:"fldjHfCgjTX0Bay6W" };
 const CLIENTE = { NOMBRE_COMERCIAL:"fld11Gh5bWcZ0CXiz", NOMBRE_FISCAL:"fldjf0CdOybWQATX4", DOMICILIO_FISCAL:"fldT27pMLegGjsla3", CODIGO_POSTAL:"flddWfBgfWLfYi4Gu", MUNICIPIO:"fldXVJQsu0EgLdUZi", PROVINCIA:"fldJ0d9vpnkSZ1DIb", PAIS:"fldcdR93qizTIeW5s", NIF:"fldJT91Hj8W2J9C0h" };
+const MATERIAL_TABLE = "tbldcH54bb4nIP2Ts";
+const MATERIAL = { CODE:"fldpB4YiAn2w8w70I", NAME:"fldDclRe2H0kqZw48", TYPE:"fld9l2c0MW70BKlzb" };
+const MATERIAL_TYPE_TABLE = "tblVYEUxcX8xtyUsv";
+const MATERIAL_TYPE = { NAME:"fldYe0hoT3OWTfwA1" };
 const COIL_NUMBER = "fldQANgNRiprhR8Hi";
-const STOCK_FIELDS = [EXISTENCIA.DESCRIPCION, COIL_NUMBER, EXISTENCIA.NETO, EXISTENCIA.BRUTO, EXISTENCIA.PESO_FACTURA, EXISTENCIA.ITEM_VENTA];
+const STOCK_FIELDS = [EXISTENCIA.DESCRIPCION, COIL_NUMBER, EXISTENCIA.NETO, EXISTENCIA.BRUTO, EXISTENCIA.PESO_FACTURA, EXISTENCIA.ITEM_VENTA, EXISTENCIA.MATERIAL];
 const SALE_FIELDS = [ITEM_VENTA.CONTRATO];
 const CONTRACT_FIELDS = [CONTRATO_VENTA.CLIENTE];
 const CUSTOMER_FIELDS = Object.values(CLIENTE);
@@ -47,8 +51,31 @@ export async function loadOwnDeliveryNote({ config, recordId, ownId }) {
   const client = new AirtableClient({ token: config.airtable.token, baseId: config.airtable.baseId });
   const note = await client.getRecord("tblEKrWWzyZQ54pWl", recordId);
   const stock = await client.listRecordsByIds(config.airtable.tables.existencias, group.stockIds, STOCK_FIELDS);
+  const materialHeadings = await materialHeadingsForStock({ client, stock });
   const fields = fieldsOf(note);
-  return { id: ownId, date: textValue(fields[ALBARAN.CARGA]), plate: textValue(fields[ALBARAN.MATRICULA]), customer: group.customer, company: config.company, lines: stock.map(record => { const f=fieldsOf(record); return { description:textValue(f[EXISTENCIA.DESCRIPCION]) || record.id, coilNumber:textValue(f[COIL_NUMBER]), weight: number(f[EXISTENCIA.PESO_FACTURA]) || number(f[EXISTENCIA.NETO]) || number(f[EXISTENCIA.BRUTO]) || 0 }; }) };
+  return { id: ownId, date: textValue(fields[ALBARAN.CARGA]), plate: textValue(fields[ALBARAN.MATRICULA]), customer: group.customer, company: config.company, materialHeadings, lines: stock.map(record => { const f=fieldsOf(record); return { description:textValue(f[EXISTENCIA.DESCRIPCION]) || record.id, coilNumber:textValue(f[COIL_NUMBER]), weight: number(f[EXISTENCIA.PESO_FACTURA]) || number(f[EXISTENCIA.NETO]) || number(f[EXISTENCIA.BRUTO]) || 0 }; }) };
+}
+
+async function materialHeadingsForStock({ client, stock }) {
+  const materialIds = [...new Set(stock.flatMap((record) => recordIds(fieldsOf(record)[EXISTENCIA.MATERIAL])) )];
+  const materials = await client.listRecordsByIds(MATERIAL_TABLE, materialIds, Object.values(MATERIAL));
+  const typeIds = [...new Set(materials.flatMap((record) => recordIds(fieldsOf(record)[MATERIAL.TYPE])) )];
+  const types = await client.listRecordsByIds(MATERIAL_TYPE_TABLE, typeIds, [MATERIAL_TYPE.NAME]);
+  const typeById = new Map(types.map((record) => [record.id, textValue(fieldsOf(record)[MATERIAL_TYPE.NAME])]));
+  return [...new Set(materials.map((record) => {
+    const fields = fieldsOf(record);
+    const name = textValue(fields[MATERIAL.NAME]) || textValue(fields[MATERIAL.CODE]);
+    const type = recordIds(fields[MATERIAL.TYPE]).map((id) => typeById.get(id)).filter(Boolean)[0] || "";
+    return formatMaterialHeading(name, type);
+  }).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en"));
+}
+
+export function formatMaterialHeading(name, type) {
+  const heading = String(name || "").trim().toUpperCase();
+  if (!heading) return "";
+  const suffix = { Bobina:"COILS", Fleje:"STRIPS", Hoja:"SHEETS", Chapa:"PLATES", "Chapa grande":"PLATES" }[String(type || "").trim()] || "";
+  if (!suffix || heading.endsWith(suffix) || heading.endsWith(suffix.slice(0, -1))) return heading;
+  return `${heading} ${suffix}`;
 }
 
 async function customersForStock({ client, config, stock }) {
