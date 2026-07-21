@@ -5,6 +5,8 @@ import { renderConfirmationResponse } from "./render/confirmation-bundle.js";
 import { renderInvoiceResponse } from "./render/bundle.js";
 import { loadConfirmationFromAirtable } from "./services/confirmation-service.js";
 import { loadInvoiceFromAirtable } from "./services/invoice-service.js";
+import { loadOwnDeliveryNote, planOwnDeliveryNotes } from "./services/own-delivery-note-service.js";
+import { renderOwnDeliveryNotePdf } from "./render/own-delivery-note-pdf.js";
 
 const config = getConfig();
 const app = Fastify({ logger: true });
@@ -14,6 +16,17 @@ app.get("/health", async () => ({
   service: "steel-trade-invoice-service"
 }));
 
+app.get("/api/delivery-notes/:recordId/own-delivery-notes/plan", async (request) =>
+  planOwnDeliveryNotes({ config, recordId: request.params.recordId })
+);
+
+app.get("/api/delivery-notes/:recordId/own-delivery-notes/:ownId.pdf", async (request, reply) => {
+  const note = await loadOwnDeliveryNote({ config, recordId: request.params.recordId, ownId: request.params.ownId });
+  const pdf = await renderOwnDeliveryNotePdf(note);
+  reply.header("Content-Type", "application/pdf");
+  reply.header("Content-Disposition", `attachment; filename="${note.id}.pdf"`);
+  return reply.send(pdf);
+});
 app.get("/api/invoices/:recordId", async (request, reply) => {
   const mode = normalizeMode(request.query.mode);
   const format = normalizeFormat(request.query.format, mode);
