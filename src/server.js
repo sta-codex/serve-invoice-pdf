@@ -13,7 +13,12 @@ const app = Fastify({ logger: true });
 
 app.get("/health", async () => ({
   ok: true,
-  service: "steel-trade-invoice-service"
+  service: "steel-trade-invoice-service",
+  deployment: {
+    repository: process.env.RENDER_GIT_REPO_SLUG || null,
+    branch: process.env.RENDER_GIT_BRANCH || null,
+    commit: process.env.RENDER_GIT_COMMIT || null
+  }
 }));
 
 app.get("/api/delivery-notes/:recordId/own-delivery-notes/plan", async (request) =>

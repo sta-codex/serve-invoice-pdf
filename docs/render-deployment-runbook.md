@@ -35,8 +35,8 @@ that the service is linked to `main` and that the deployed commit matches
 3. Commit only the intended files.
 4. Push the production commit to `sta-codex HEAD:main`.
 5. Confirm `git ls-remote sta-codex refs/heads/main` returns that commit.
-6. Wait for Render's automatic deployment and verify the same commit appears
-   in the Render event.
+6. Wait for Render's automatic deployment and verify `/health` reports
+   repository `sta-codex/serve-invoice-pdf`, branch `main`, and the same commit.
 7. Verify `/health` and the changed functional endpoint on the public URL,
    using a known real Airtable record. A fake record only proves route wiring
    and does not detect stale or mistyped Airtable field IDs.
@@ -45,6 +45,10 @@ that the service is linked to `main` and that the deployed commit matches
 
 Never report a production change as complete based only on a Git push or a
 successful `/health` response.
+
+The `/health` response intentionally exposes only Render's non-secret
+deployment identity (`RENDER_GIT_REPO_SLUG`, `RENDER_GIT_BRANCH`, and
+`RENDER_GIT_COMMIT`) so branch drift is machine-verifiable.
 
 ## Functional routes currently served
 
