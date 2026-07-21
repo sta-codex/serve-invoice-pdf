@@ -22,7 +22,7 @@ if (!record) {
 const baseUrl = String(CFG.serviceBaseUrl).replace(/\/+$/, "");
 const planUrl = `${baseUrl}/api/delivery-notes/${record.id}/own-delivery-notes/plan?v=${Date.now()}`;
 output.text("Preparando albaranes propios...");
-const response = await fetch(planUrl);
+const response = await remoteFetchAsync(planUrl);
 if (!response.ok) throw new Error(`El servicio no pudo preparar los albaranes (${response.status}). ${await response.text()}`);
 const plan = await response.json();
 if (!Array.isArray(plan.groups) || !plan.groups.length) throw new Error("No hay clientes con existencias válidas en este albarán.");
