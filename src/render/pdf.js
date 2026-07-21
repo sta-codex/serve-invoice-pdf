@@ -383,6 +383,8 @@ function drawFooter(doc, invoice, mode) {
   y += 10;
   drawFooterRow(doc, "Customer order number:", "", x, y, true);
   y += 10;
+  drawFooterRow(doc, "Delivery ID:", truncate(invoice.deliveryId, 62), x, y);
+  y += 10;
   drawFooterRow(doc, "Delivery terms:", invoice.deliveryTerms, x, y);
   y += 10;
   doc.font("Helvetica-Bold").text("Payment terms:", x, y);

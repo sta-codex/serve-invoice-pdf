@@ -14,6 +14,11 @@ export const LINKED_TABLES = {
   purchaseItems: {
     tableId: "tblVZncIvXViG3IvO",
     primaryFieldId: "fld0CH2JzvCx1Ly8x"
+  },
+  deliveryLines: {
+    tableId: "tbl1m6HjYXJXZhIaj",
+    primaryFieldId: "fldX7oosP8oQaXBFr",
+    fieldName: "Nombre"
   }
 };
 

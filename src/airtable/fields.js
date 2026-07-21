@@ -41,6 +41,7 @@ export const EXISTENCIA = {
   ITEM_VENTA: "fld6aouedO2bl0MuG",
   ITEM_COMPRA: "fld1LfDllQPTAX466",
   FACTURA: "fldsU4N8lvdySqsn0",
+  LINEAS_ALBARAN: "fld7itIHXYOABbzPE",
   TIPO_EXISTENCIA: "fld9jN4CH3KaXAyxc",
   NETO_BRUTO_CLIENTE: "fldOeiDrQFe5AO1Rf",
   MONEDA: "flddY6XIvf9FnmXH4",

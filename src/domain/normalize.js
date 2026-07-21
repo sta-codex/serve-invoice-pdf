@@ -47,6 +47,10 @@ export function normalizeInvoiceRecord({
     deliveryTerms:
       namesFromIds(linkedNames.incoterms, recordIds(fields[FACTURA.INCOTERM])) ||
       textValue(fields[FACTURA.INCOTERM]),
+    deliveryId: deliveryLineNamesFromExistences(
+      linkedNames.deliveryLines,
+      existenceRecords
+    ),
     paymentTerms:
       namesFromIds(linkedNames.paymentTerms, recordIds(fields[FACTURA.TERMINOS_PAGO])) ||
       textValue(fields[FACTURA.TERMINOS_PAGO]),
@@ -81,7 +85,14 @@ export function finalizeInvoice(invoice) {
     totalQuantity,
     packingList:
       invoice.packingList ||
-      unique(lines.map((line) => line.packingList).filter(Boolean)).join(" / ")
+      unique(lines.map((line) => line.packingList).filter(Boolean)).join(" / "),
+    deliveryId:
+      invoice.deliveryId ||
+      unique(
+        lines
+          .flatMap((line) => line.deliveryLineIds || [])
+          .filter(Boolean)
+      ).join(" / ")
   };
 }
 
@@ -121,6 +132,7 @@ function normalizeExistenciaRecord(record, linkedNames) {
     purchaseItemName: namesFromIds(linkedNames.purchaseItems, purchaseItemIds),
     saleItemIds: recordIds(fields[EXISTENCIA.ITEM_VENTA]),
     invoiceIds: recordIds(fields[EXISTENCIA.FACTURA]),
+    deliveryLineIds: recordIds(fields[EXISTENCIA.LINEAS_ALBARAN]),
     quantity,
     net: numberValue(fields[EXISTENCIA.NETO]) || quantity,
     gross: numberValue(fields[EXISTENCIA.BRUTO]) || quantity,
@@ -184,9 +196,35 @@ function groupLines(lines) {
   }));
 }
 
+function deliveryLineNamesFromExistences(nameMap, existenceRecords) {
+  if (!nameMap || !existenceRecords?.length) return "";
+
+  const lineIdGroups = existenceRecords
+    .map((existenceRecord) =>
+      recordIds(fieldsOf(existenceRecord)[EXISTENCIA.LINEAS_ALBARAN])
+    )
+    .filter((ids) => ids.length > 0);
+
+  if (!lineIdGroups.length) return "";
+
+  const commonIds = intersectMany(lineIdGroups);
+  const selectedIds = commonIds.length
+    ? commonIds
+    : unique(lineIdGroups.flat());
+
+  return namesFromIds(nameMap, selectedIds);
+}
+
 function namesFromIds(nameMap, ids) {
   if (!nameMap || !ids?.length) return "";
   return ids.map((id) => nameMap.get(id)).filter(Boolean).join(" / ");
+}
+
+function intersectMany(groups) {
+  const [first, ...rest] = groups;
+  return unique(first).filter((id) =>
+    rest.every((group) => group.includes(id))
+  );
 }
 
 function roundQuantity(value) {

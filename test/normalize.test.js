@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { finalizeInvoice } from "../src/domain/normalize.js";
+import { finalizeInvoice, normalizeInvoiceRecord } from "../src/domain/normalize.js";
+import { EXISTENCIA, FACTURA } from "../src/airtable/fields.js";
 
 test("groups invoice lines by purchase item, description and price", () => {
   const invoice = finalizeInvoice({
@@ -16,6 +17,32 @@ test("groups invoice lines by purchase item, description and price", () => {
   assert.equal(invoice.groupedLines[0].quantity, 25);
   assert.equal(invoice.groupedLines[0].amount, 12125);
   assert.equal(invoice.subtotal, 21925);
+});
+
+test("uses delivery line Nombre values for invoice delivery id", () => {
+  const invoice = normalizeInvoiceRecord({
+    record: {
+      id: "recInvoice",
+      fields: {
+        [FACTURA.ID]: "T-3",
+        [FACTURA.EXISTENCIAS]: [{ id: "recStock" }]
+      }
+    },
+    existenceRecords: [
+      {
+        id: "recStock",
+        fields: {
+          [EXISTENCIA.LINEAS_ALBARAN]: [{ id: "recLine" }]
+        }
+      }
+    ],
+    company: {},
+    linkedNames: {
+      deliveryLines: new Map([["recLine", "419029"]])
+    }
+  });
+
+  assert.equal(invoice.deliveryId, "419029");
 });
 
 function line(purchaseItemId, description, quantity, price) {

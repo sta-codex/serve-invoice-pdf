@@ -46,6 +46,9 @@ async function loadLinkedNames(client, invoiceRecord, existenceRecords) {
     paymentTerms: recordIds(invoiceFields[FACTURA.TERMINOS_PAGO]),
     purchaseItems: existenceFields.flatMap((fields) =>
       recordIds(fields[EXISTENCIA.ITEM_COMPRA])
+    ),
+    deliveryLines: existenceFields.flatMap((fields) =>
+      recordIds(fields[EXISTENCIA.LINEAS_ALBARAN])
     )
   };
 
@@ -63,14 +66,20 @@ async function loadDisplayNameMap(client, table, ids) {
   const uniqueIds = [...new Set(ids)].filter(Boolean);
   if (!uniqueIds.length) return new Map();
 
-  const records = await client.listRecordsByIds(table.tableId, uniqueIds, [
-    table.primaryFieldId
-  ]);
+  const records = table.fieldName
+    ? await client.listRecordsByIdsWithFieldNames(table.tableId, uniqueIds, [
+        table.fieldName
+      ])
+    : await client.listRecordsByIds(table.tableId, uniqueIds, [
+        table.primaryFieldId
+      ]);
+  const displayField = table.fieldName || table.primaryFieldId;
+
   return new Map(
     records
       .map((record) => [
         record.id,
-        textValue(fieldsOf(record)[table.primaryFieldId])
+        textValue(fieldsOf(record)[displayField])
       ])
       .filter(([, name]) => name)
   );

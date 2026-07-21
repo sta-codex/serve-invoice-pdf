@@ -71,9 +71,32 @@ export class AirtableClient {
     return records;
   }
 
+  async listRecordsByIdsWithFieldNames(tableId, recordIds, fieldNames = []) {
+    if (!recordIds.length) {
+      return [];
+    }
+
+    const records = [];
+    for (const ids of chunks([...new Set(recordIds)], 40)) {
+      const filterByFormula = `OR(${ids
+        .map((id) => `RECORD_ID()='${escapeFormulaString(id)}'`)
+        .join(",")})`;
+      records.push(
+        ...(await this.#listRecords(tableId, {
+          filterByFormula,
+          fields: fieldNames,
+          pageSize: 100,
+          returnFieldsByFieldId: false
+        }))
+      );
+    }
+    return records;
+  }
+
   async #listRecords(tableId, body) {
     const records = [];
     let offset;
+    const { returnFieldsByFieldId = true, ...requestBody } = body;
 
     do {
       const response = await this.#fetchJson(
@@ -81,9 +104,9 @@ export class AirtableClient {
         {
           method: "POST",
           body: JSON.stringify({
-            ...body,
+            ...requestBody,
             offset,
-            returnFieldsByFieldId: true
+            returnFieldsByFieldId
           })
         }
       );
