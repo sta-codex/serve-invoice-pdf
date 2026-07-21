@@ -93,6 +93,14 @@ export class AirtableClient {
     return records;
   }
 
+  async listRecords(tableId, { fields = [], filterByFormula, pageSize = 100 } = {}) {
+    return this.#listRecords(tableId, {
+      fields,
+      filterByFormula,
+      pageSize
+    });
+  }
+
   async #listRecords(tableId, body) {
     const records = [];
     let offset;
