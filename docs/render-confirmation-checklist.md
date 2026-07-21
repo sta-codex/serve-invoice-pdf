@@ -1,5 +1,9 @@
 # Render confirmation service checklist
 
+For repository, branch, deployment and all-route checks, first follow
+`docs/render-deployment-runbook.md`. This checklist adds the confirmation-specific
+document and Airtable attachment verification.
+
 Use this checklist before telling Lucas that a confirmation-document change is done.
 
 ## Production target

@@ -1,6 +1,9 @@
 services:
   - type: web
     name: steel-trade-invoice-service
+    repo: https://github.com/sta-codex/serve-invoice-pdf.git
+    branch: main
+    autoDeployTrigger: commit
     runtime: node
     plan: free
     buildCommand: pnpm install --frozen-lockfile
