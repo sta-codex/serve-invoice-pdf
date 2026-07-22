@@ -1,5 +1,5 @@
 import { FACTURA, EXISTENCIA } from "../airtable/fields.js";
-import { buildMeasure, roundMoney } from "./format.js";
+import { buildMeasure, normalizeThicknessInMeasure, roundMoney } from "./format.js";
 import {
   dateValue,
   fieldsOf,
@@ -142,7 +142,7 @@ function normalizeExistenciaRecord(record, linkedNames) {
     packingList,
     description:
       [material, measure, quality].filter(Boolean).join(" ") ||
-      rawDescription,
+      normalizeThicknessInMeasure(rawDescription),
     detailDescription: [
       material,
       measure,

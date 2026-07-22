@@ -27,13 +27,20 @@ export function roundMoney(value) {
 }
 
 export function buildMeasure({ thickness, width, length, fallback }) {
-  if (fallback) return fallback;
+  if (fallback) return normalizeThicknessInMeasure(fallback);
   const parts = [thickness, width, length].filter(
     (part) => part !== undefined && part !== null && part !== ""
   );
   return parts.map((part, index) =>
     index === 0 ? formatThickness(part) : String(part).replace(".", ",")
   ).join(" x ");
+}
+
+export function normalizeThicknessInMeasure(value) {
+  const text = String(value || "");
+  return text.replace(/(\d+(?:[.,]\d+)?)\s*x\s*\d+/i, (match, thickness) =>
+    `${formatThickness(thickness)}${match.slice(thickness.length)}`
+  );
 }
 
 function formatThickness(value) {

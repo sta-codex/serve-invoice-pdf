@@ -1,5 +1,6 @@
 import { AirtableClient } from "../airtable/client.js";
 import { CONTRATO_VENTA, EXISTENCIA, ITEM_VENTA } from "../airtable/fields.js";
+import { normalizeThicknessInMeasure } from "../domain/format.js";
 import { fieldsOf, recordIds, textValue } from "../domain/values.js";
 
 const ALBARAN = { CARGA:"fldphpQv8LKwpAMOI", MATRICULA:"fld4334sjMHctSjz5", EXISTENCIAS:"fldScPqK214RzAQSW", ALBARAN_PROPIO_ID:"fldqxidJFKKnpLFiv", ALBARAN_PROPIO_PDF:"fldjHfCgjTX0Bay6W" };
@@ -52,7 +53,7 @@ export async function loadOwnDeliveryNote({ config, recordId, ownId }) {
   const stock = await client.listRecordsByIds(config.airtable.tables.existencias, group.stockIds, STOCK_FIELDS);
   const material = await materialDetailsForStock({ client, stock });
   const fields = fieldsOf(note);
-  return { id: ownId, date: textValue(fields[ALBARAN.CARGA]), plate: textValue(fields[ALBARAN.MATRICULA]), customer: group.customer, company: config.company, materialHeadings: material.headings, identifierLabel: identifierLabelForMaterialTypes(material.types), lines: stock.map(record => { const f=fieldsOf(record); return { description:textValue(f[EXISTENCIA.DESCRIPCION]) || record.id, factoryId:textValue(f[EXISTENCIA.ID_FABRICA]), weight: number(f[EXISTENCIA.PESO_FACTURA]) || number(f[EXISTENCIA.NETO]) || number(f[EXISTENCIA.BRUTO]) || 0 }; }) };
+  return { id: ownId, date: textValue(fields[ALBARAN.CARGA]), plate: textValue(fields[ALBARAN.MATRICULA]), customer: group.customer, company: config.company, materialHeadings: material.headings, identifierLabel: identifierLabelForMaterialTypes(material.types), lines: stock.map(record => { const f=fieldsOf(record); return { description:normalizeThicknessInMeasure(textValue(f[EXISTENCIA.DESCRIPCION])) || record.id, factoryId:textValue(f[EXISTENCIA.ID_FABRICA]), weight: number(f[EXISTENCIA.PESO_FACTURA]) || number(f[EXISTENCIA.NETO]) || number(f[EXISTENCIA.BRUTO]) || 0 }; }) };
 }
 
 async function materialDetailsForStock({ client, stock }) {
