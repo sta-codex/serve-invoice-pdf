@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   allocateOwnIdsForDate,
+  clientDestinationStockIds,
   formatMaterialHeading,
   identifierLabelForMaterialTypes
 } from "../src/services/own-delivery-note-service.js";
@@ -80,6 +81,44 @@ test("labels the identifier column from the Airtable material type", () => {
   assert.equal(identifierLabelForMaterialTypes(["Chapa grande"]), "Plate number");
   assert.equal(identifierLabelForMaterialTypes(["Bobina", "Chapa"]), "Coil / Plate number");
 });
+
+test("keeps only stock from delivery lines whose destination type is Cliente", () => {
+  assert.deepEqual(clientDestinationStockIds({
+    noteStockIds: ["stock-client", "stock-warehouse", "stock-port"],
+    deliveryLines: [
+      deliveryLine("Cliente", ["stock-client"]),
+      deliveryLine("Almacén", ["stock-warehouse"]),
+      deliveryLine("Puerto", ["stock-port"])
+    ]
+  }), ["stock-client"]);
+});
+
+test("returns no stock when the delivery note has no Cliente destination line", () => {
+  assert.deepEqual(clientDestinationStockIds({
+    noteStockIds: ["stock-warehouse"],
+    deliveryLines: [deliveryLine("Almacén", ["stock-warehouse"])]
+  }), []);
+});
+
+test("deduplicates Cliente stock and ignores stock outside the delivery note", () => {
+  assert.deepEqual(clientDestinationStockIds({
+    noteStockIds: ["stock-one", "stock-two"],
+    deliveryLines: [
+      deliveryLine(["Cliente"], ["stock-one", "stock-foreign"]),
+      deliveryLine({ valuesByLinkedRecordId: { transport: [{ name: "cliente" }] } }, ["stock-one", "stock-two"])
+    ]
+  }), ["stock-one", "stock-two"]);
+});
+
+function deliveryLine(destinationType, stockIds) {
+  return {
+    id: `line-${stockIds.join("-")}`,
+    fields: {
+      fldamKV8278oeI3Mu: destinationType,
+      flddftUO5cin39AY2: stockIds
+    }
+  };
+}
 
 function allocate(overrides) {
   return allocateOwnIdsForDate({

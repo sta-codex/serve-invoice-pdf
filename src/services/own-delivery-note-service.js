@@ -3,7 +3,9 @@ import { CONTRATO_VENTA, EXISTENCIA, ITEM_VENTA } from "../airtable/fields.js";
 import { normalizeThicknessInMeasure } from "../domain/format.js";
 import { fieldsOf, recordIds, textValue } from "../domain/values.js";
 
-const ALBARAN = { CARGA:"fldphpQv8LKwpAMOI", MATRICULA:"fld4334sjMHctSjz5", EXISTENCIAS:"fldScPqK214RzAQSW", ALBARAN_PROPIO_ID:"fldqxidJFKKnpLFiv", ALBARAN_PROPIO_PDF:"fldjHfCgjTX0Bay6W" };
+const ALBARAN = { CARGA:"fldphpQv8LKwpAMOI", MATRICULA:"fld4334sjMHctSjz5", EXISTENCIAS:"fldScPqK214RzAQSW", LINEAS:"fldxLftcZyUdc0EQN", ALBARAN_PROPIO_ID:"fldqxidJFKKnpLFiv", ALBARAN_PROPIO_PDF:"fldjHfCgjTX0Bay6W" };
+const LINEA_ALBARAN_TABLE = "tbl1m6HjYXJXZhIaj";
+const LINEA_ALBARAN = { EXISTENCIAS:"flddftUO5cin39AY2", TIPO_DESTINO:"fldamKV8278oeI3Mu" };
 const CLIENTE = { NOMBRE_COMERCIAL:"fld11Gh5bWcZ0CXiz", NOMBRE_FISCAL:"fldjf0CdOybWQATX4", DOMICILIO_FISCAL:"fldT27pMLegGjsla3", CODIGO_POSTAL:"flddWfBgfWLfYi4Gu", MUNICIPIO:"fldXVJQsu0EgLdUZi", PROVINCIA:"fldJ0d9vpnkSZ1DIb", PAIS:"fldcdR93qizTIeW5s", NIF:"fldJT91Hj8W2J9C0h" };
 const MATERIAL_TABLE = "tbldcH54bb4nIP2Ts";
 const MATERIAL = { CODE:"fldpB4YiAn2w8w70I", NAME:"fldDclRe2H0kqZw48", TYPE:"fld9l2c0MW70BKlzb" };
@@ -21,7 +23,17 @@ export async function planOwnDeliveryNotes({ config, recordId }) {
   const fields = fieldsOf(note);
   const date = textValue(fields[ALBARAN.CARGA]);
   if (!date) throw new Error("El albarán no tiene Carga; no se puede generar su ID.");
-  const stock = await client.listRecordsByIds(config.airtable.tables.existencias, recordIds(fields[ALBARAN.EXISTENCIAS]), STOCK_FIELDS);
+  const noteStockIds = recordIds(fields[ALBARAN.EXISTENCIAS]);
+  const deliveryLines = await client.listRecordsByIds(
+    LINEA_ALBARAN_TABLE,
+    recordIds(fields[ALBARAN.LINEAS]),
+    Object.values(LINEA_ALBARAN)
+  );
+  const eligibleStockIds = clientDestinationStockIds({ deliveryLines, noteStockIds });
+  if (!eligibleStockIds.length) {
+    throw new Error("El albarán no tiene existencias en líneas cuyo Tipo de destino sea Cliente.");
+  }
+  const stock = await client.listRecordsByIds(config.airtable.tables.existencias, eligibleStockIds, STOCK_FIELDS);
   if (!stock.length) throw new Error("El albarán no tiene Existencias.");
   const customerByStockId = await customersForStock({ client, config, stock });
   const groups = new Map();
@@ -42,6 +54,29 @@ export async function planOwnDeliveryNotes({ config, recordId }) {
     preserveCurrent: Array.isArray(fields[ALBARAN.ALBARAN_PROPIO_PDF]) && fields[ALBARAN.ALBARAN_PROPIO_PDF].length > 0
   });
   return { date, groups: sortedGroups.map((group, index) => ({ id: ids[index], customer: group.customer, stockIds: group.stock.map(x => x.id), count: group.stock.length })) };
+}
+
+export function clientDestinationStockIds({ deliveryLines, noteStockIds }) {
+  const allowed = new Set(Array.isArray(noteStockIds) ? noteStockIds : []);
+  const eligible = [];
+  const seen = new Set();
+
+  for (const line of Array.isArray(deliveryLines) ? deliveryLines : []) {
+    const fields = fieldsOf(line);
+    const destinationTypes = textValue(fields[LINEA_ALBARAN.TIPO_DESTINO], "\n")
+      .split("\n")
+      .map((value) => value.trim().toLocaleLowerCase("es"))
+      .filter(Boolean);
+    if (!destinationTypes.includes("cliente")) continue;
+
+    for (const stockId of recordIds(fields[LINEA_ALBARAN.EXISTENCIAS])) {
+      if (!allowed.has(stockId) || seen.has(stockId)) continue;
+      seen.add(stockId);
+      eligible.push(stockId);
+    }
+  }
+
+  return eligible;
 }
 
 export async function loadOwnDeliveryNote({ config, recordId, ownId }) {
