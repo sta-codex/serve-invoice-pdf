@@ -4,7 +4,9 @@ import { formatDateEs } from "../domain/values.js";
 
 const PAGE = { width: 595.28, height: 841.89, margin: 50 };
 export const OWN_DELIVERY_NOTE_LABEL = "DELIVERY NOTE:";
-export const FACTORY_ID_LABEL = "Factory ID";
+export const COIL_NUMBER_LABEL = "Coil number";
+export const PLATE_NUMBER_LABEL = "Plate number";
+export const MIXED_IDENTIFIER_LABEL = "Coil / Plate number";
 export const TOTAL_LABEL = "TOTAL";
 export const CARRIER_DETAILS_LABEL = "CARRIER DETAILS";
 export const LICENSE_PLATE_LABEL = "License plate:";
@@ -23,7 +25,7 @@ export async function renderOwnDeliveryNotePdf(note) {
   drawHeader(doc, note);
   let y = 202;
   y = drawMaterialHeadings(doc, note.materialHeadings, y);
-  y = drawTable(doc, note.lines, y);
+  y = drawTable(doc, note.lines, y, note.identifierLabel);
   y += 24;
   doc.font("Helvetica-Bold").fontSize(9).text(CARRIER_DETAILS_LABEL, PAGE.margin, y);
   y += 16;
@@ -58,15 +60,15 @@ function drawHeader(doc, note) {
   doc.font("Helvetica").fontSize(9).text(formatOwnDeliveryNoteDate(note.date), 470, 170, { width: 75, align: "right" });
 }
 
-function drawTable(doc, lines, y) {
+function drawTable(doc, lines, y, identifierLabel) {
   const columns = tableColumns();
-  y = drawTableHeader(doc, columns, y);
+  y = drawTableHeader(doc, columns, y, identifierLabel);
   for (const line of lines) {
     doc.font("Helvetica").fontSize(8);
     const h = Math.max(18, Math.ceil(doc.heightOfString(line.description || "", { width: columns.descW - 8 })) + 8);
     if (y + h > PAGE.height - 130) {
       doc.addPage();
-      y = drawTableHeader(doc, columns, 55);
+      y = drawTableHeader(doc, columns, 55, identifierLabel);
     }
     drawTableRow(doc, columns, y, h, line);
     y += h;
@@ -75,7 +77,7 @@ function drawTable(doc, lines, y) {
   const totalH = 22;
   if (y + totalH > PAGE.height - 110) {
     doc.addPage();
-    y = drawTableHeader(doc, columns, 55);
+    y = drawTableHeader(doc, columns, 55, identifierLabel);
   }
   drawTotalRow(doc, columns, y, totalH, totalWeight(lines));
   return y + totalH;
@@ -89,12 +91,12 @@ function tableColumns() {
   return { x, width, descW, factoryW, weightW: width - descW - factoryW, head: 18 };
 }
 
-function drawTableHeader(doc, columns, y) {
+function drawTableHeader(doc, columns, y, identifierLabel) {
   const { x, width, descW, factoryW, weightW, head } = columns;
   drawTableGrid(doc, columns, y, head);
   doc.font("Helvetica-Bold").fontSize(8);
   doc.text("Description", x + 3, y + 5, { width: descW - 6, align: "center" });
-  doc.text(FACTORY_ID_LABEL, x + descW + 3, y + 5, { width: factoryW - 6, align: "center" });
+  doc.text(identifierLabel || MIXED_IDENTIFIER_LABEL, x + descW + 3, y + 5, { width: factoryW - 6, align: "center" });
   doc.text("Weight (MT)", x + descW + factoryW + 3, y + 5, { width: weightW - 6, align: "center" });
   return y + head;
 }

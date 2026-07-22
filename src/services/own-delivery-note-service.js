@@ -50,23 +50,26 @@ export async function loadOwnDeliveryNote({ config, recordId, ownId }) {
   const client = new AirtableClient({ token: config.airtable.token, baseId: config.airtable.baseId });
   const note = await client.getRecord("tblEKrWWzyZQ54pWl", recordId);
   const stock = await client.listRecordsByIds(config.airtable.tables.existencias, group.stockIds, STOCK_FIELDS);
-  const materialHeadings = await materialHeadingsForStock({ client, stock });
+  const material = await materialDetailsForStock({ client, stock });
   const fields = fieldsOf(note);
-  return { id: ownId, date: textValue(fields[ALBARAN.CARGA]), plate: textValue(fields[ALBARAN.MATRICULA]), customer: group.customer, company: config.company, materialHeadings, lines: stock.map(record => { const f=fieldsOf(record); return { description:textValue(f[EXISTENCIA.DESCRIPCION]) || record.id, factoryId:textValue(f[EXISTENCIA.ID_FABRICA]), weight: number(f[EXISTENCIA.PESO_FACTURA]) || number(f[EXISTENCIA.NETO]) || number(f[EXISTENCIA.BRUTO]) || 0 }; }) };
+  return { id: ownId, date: textValue(fields[ALBARAN.CARGA]), plate: textValue(fields[ALBARAN.MATRICULA]), customer: group.customer, company: config.company, materialHeadings: material.headings, identifierLabel: identifierLabelForMaterialTypes(material.types), lines: stock.map(record => { const f=fieldsOf(record); return { description:textValue(f[EXISTENCIA.DESCRIPCION]) || record.id, factoryId:textValue(f[EXISTENCIA.ID_FABRICA]), weight: number(f[EXISTENCIA.PESO_FACTURA]) || number(f[EXISTENCIA.NETO]) || number(f[EXISTENCIA.BRUTO]) || 0 }; }) };
 }
 
-async function materialHeadingsForStock({ client, stock }) {
+async function materialDetailsForStock({ client, stock }) {
   const materialIds = [...new Set(stock.flatMap((record) => recordIds(fieldsOf(record)[EXISTENCIA.MATERIAL])) )];
   const materials = await client.listRecordsByIds(MATERIAL_TABLE, materialIds, Object.values(MATERIAL));
   const typeIds = [...new Set(materials.flatMap((record) => recordIds(fieldsOf(record)[MATERIAL.TYPE])) )];
   const types = await client.listRecordsByIds(MATERIAL_TYPE_TABLE, typeIds, [MATERIAL_TYPE.NAME]);
   const typeById = new Map(types.map((record) => [record.id, textValue(fieldsOf(record)[MATERIAL_TYPE.NAME])]));
-  return [...new Set(materials.map((record) => {
+  const materialById = new Map(materials.map((record) => {
     const fields = fieldsOf(record);
     const name = textValue(fields[MATERIAL.NAME]) || textValue(fields[MATERIAL.CODE]);
     const type = recordIds(fields[MATERIAL.TYPE]).map((id) => typeById.get(id)).filter(Boolean)[0] || "";
-    return formatMaterialHeading(name, type);
-  }).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en"));
+    return [record.id, { heading: formatMaterialHeading(name, type), type }];
+  }));
+  const headings = [...new Set([...materialById.values()].map((material) => material.heading).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en"));
+  const stockTypes = stock.flatMap((record) => recordIds(fieldsOf(record)[EXISTENCIA.MATERIAL]).map((id) => materialById.get(id)?.type).filter(Boolean));
+  return { headings, types: stockTypes };
 }
 
 export function formatMaterialHeading(name, type) {
@@ -75,6 +78,17 @@ export function formatMaterialHeading(name, type) {
   const suffix = { Bobina:"COILS", Fleje:"STRIPS", Hoja:"SHEETS", Chapa:"PLATES", "Chapa grande":"PLATES" }[String(type || "").trim()] || "";
   if (!suffix || heading.endsWith(suffix) || heading.endsWith(suffix.slice(0, -1))) return heading;
   return `${heading} ${suffix}`;
+}
+
+export function identifierLabelForMaterialTypes(types) {
+  const labels = new Set();
+  for (const type of Array.isArray(types) ? types : []) {
+    const normalized = String(type || "").trim();
+    if (["Bobina", "Fleje"].includes(normalized)) labels.add("Coil number");
+    else if (["Chapa", "Chapa grande", "Hoja"].includes(normalized)) labels.add("Plate number");
+    else labels.add("Coil / Plate number");
+  }
+  return labels.size === 1 ? [...labels][0] : "Coil / Plate number";
 }
 
 async function customersForStock({ client, config, stock }) {

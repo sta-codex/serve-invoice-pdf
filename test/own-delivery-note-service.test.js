@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   allocateOwnIdsForDate,
-  formatMaterialHeading
+  formatMaterialHeading,
+  identifierLabelForMaterialTypes
 } from "../src/services/own-delivery-note-service.js";
 
 const DATE = "2026-06-29";
@@ -71,6 +72,13 @@ test("builds the long English material heading from Airtable material data", () 
     formatMaterialHeading("Hot Rolled Plates", "Chapa"),
     "HOT ROLLED PLATES"
   );
+});
+
+test("labels the identifier column from the Airtable material type", () => {
+  assert.equal(identifierLabelForMaterialTypes(["Bobina"]), "Coil number");
+  assert.equal(identifierLabelForMaterialTypes(["Chapa"]), "Plate number");
+  assert.equal(identifierLabelForMaterialTypes(["Chapa grande"]), "Plate number");
+  assert.equal(identifierLabelForMaterialTypes(["Bobina", "Chapa"]), "Coil / Plate number");
 });
 
 function allocate(overrides) {

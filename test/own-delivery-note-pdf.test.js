@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   CARRIER_DETAILS_LABEL,
-  FACTORY_ID_LABEL,
+  COIL_NUMBER_LABEL,
   formatOwnDeliveryNoteDate,
   LICENSE_PLATE_LABEL,
+  MIXED_IDENTIFIER_LABEL,
   ownDeliveryNoteTaxId,
   OWN_DELIVERY_NOTE_LABEL,
+  PLATE_NUMBER_LABEL,
   renderOwnDeliveryNotePdf,
   TOTAL_LABEL,
   totalWeight
@@ -14,7 +16,9 @@ import {
 
 test("uses English labels throughout the delivery note template", () => {
   assert.equal(OWN_DELIVERY_NOTE_LABEL, "DELIVERY NOTE:");
-  assert.equal(FACTORY_ID_LABEL, "Factory ID");
+  assert.equal(COIL_NUMBER_LABEL, "Coil number");
+  assert.equal(PLATE_NUMBER_LABEL, "Plate number");
+  assert.equal(MIXED_IDENTIFIER_LABEL, "Coil / Plate number");
   assert.equal(TOTAL_LABEL, "TOTAL");
   assert.equal(CARRIER_DETAILS_LABEL, "CARRIER DETAILS");
   assert.equal(LICENSE_PLATE_LABEL, "License plate:");
@@ -57,6 +61,7 @@ test("renders an own delivery note as a PDF", async () => {
       taxId: "B11111111"
     },
     materialHeadings: ["PREPAINTED GALVANIZED STEEL COILS"],
+    identifierLabel: "Coil number",
     lines: [
       { description: "Steel coil", factoryId: "TNMM2504260107-12", weight: 12.345 }
     ]
