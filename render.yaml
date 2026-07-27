@@ -24,3 +24,20 @@ services:
         value: tblmx0d8G49Qx29LD
       - key: AIRTABLE_ITEMS_COMPRA_TABLE_ID
         value: tblVZncIvXViG3IvO
+  - type: web
+    name: sta-invoice-pdf-service
+    repo: https://github.com/sta-codex/serve-invoice-pdf.git
+    branch: main
+    autoDeployTrigger: commit
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python tools/serve-invoice-pdf.py
+    healthCheckPath: /health
+    envVars:
+      - key: STA_INVOICE_UPLOAD
+        value: "false"
+      - key: STA_INVOICE_CACHE_TTL_SECONDS
+        value: "900"
+      - key: STA_INVOICE_SERVICE_TOKEN
+        sync: false
