@@ -4,6 +4,8 @@ import { ITEM_VENTA } from "../src/airtable/fields.js";
 import {
   confirmationTotalQuantity,
   loadedQuantityByCustomerWeightMode,
+  normalizeQuantitySource,
+  selectConfirmationQuantity,
   storageDeliveryKindFromPlaces
 } from "../src/services/confirmation-service.js";
 
@@ -24,6 +26,40 @@ test("uses loaded item total before theoretical contract weight", () => {
     65.66
   );
   assert.equal(confirmationTotalQuantity([{ quantity: 0 }], 88), 88);
+});
+
+test("selects contract sale coil weight when requested", () => {
+  assert.equal(
+    selectConfirmationQuantity({
+      quantitySource: "contract-sale-coils",
+      selectedLoadedQuantity: 11,
+      loadedQuantity: 12,
+      contractSaleCoilsQuantity: 10.25,
+      existenceQuantity: 9.75,
+      purchaseContractNetQuantity: 13
+    }),
+    10.25
+  );
+});
+
+test("selects assigned stock weight when requested", () => {
+  assert.equal(
+    selectConfirmationQuantity({
+      quantitySource: "assigned-stock",
+      selectedLoadedQuantity: 11,
+      loadedQuantity: 12,
+      contractSaleCoilsQuantity: 10.25,
+      existenceQuantity: 9.75,
+      purchaseContractNetQuantity: 13
+    }),
+    9.75
+  );
+});
+
+test("normalizes Airtable button quantity source labels", () => {
+  assert.equal(normalizeQuantitySource("Peso contrato venta bobinas"), "contract-sale-coils");
+  assert.equal(normalizeQuantitySource("Existencias asignadas"), "assigned-stock");
+  assert.equal(normalizeQuantitySource(""), "default");
 });
 
 test("uses only DDP delivery place types for storage kind", () => {

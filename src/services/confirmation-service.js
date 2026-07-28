@@ -105,7 +105,11 @@ const CONTRACT_LINKED_TABLES = {
   }
 };
 
-export async function loadConfirmationFromAirtable({ config, recordId }) {
+export async function loadConfirmationFromAirtable({
+  config,
+  recordId,
+  quantitySource = "default"
+}) {
   const client = new AirtableClient({
     token: config.airtable.token,
     baseId: config.airtable.baseId
@@ -163,7 +167,8 @@ export async function loadConfirmationFromAirtable({ config, recordId }) {
     purchaseOriginByPurchaseItemId,
     existenceRecords,
     linkedNames,
-    company: config.company
+    company: config.company,
+    quantitySource
   });
 }
 
@@ -175,7 +180,8 @@ function normalizeConfirmation({
   purchaseOriginByPurchaseItemId,
   existenceRecords,
   linkedNames,
-  company
+  company,
+  quantitySource
 }) {
   const fields = fieldsOf(record);
   const purchaseItemsById = new Map(
@@ -199,7 +205,8 @@ function normalizeConfirmation({
         existenceRecords: existencesBySaleItemId.get(saleItemRecord.id) || [],
         linkedNames,
         contractDeliveryTerms,
-        customerWeightMode
+        customerWeightMode,
+        quantitySource
       })
     )
     .sort(compareItemNumber);
@@ -246,7 +253,8 @@ function normalizeConfirmation({
     items,
     origin: origins.join(" / "),
     origins,
-    totalQuantity
+    totalQuantity,
+    quantitySource: normalizeQuantitySource(quantitySource)
   };
 }
 
@@ -258,7 +266,8 @@ function normalizeSaleItem({
   existenceRecords,
   linkedNames,
   contractDeliveryTerms,
-  customerWeightMode
+  customerWeightMode,
+  quantitySource
 }) {
   const fields = fieldsOf(saleItemRecord);
   const purchaseItemIds = recordIds(fields[ITEM_VENTA.ITEM_COMPRA]);
@@ -299,13 +308,14 @@ function normalizeSaleItem({
     fields,
     itemCustomerWeightMode
   );
-  const quantity =
-    meaningfulQuantity(selectedLoadedQuantity) ??
-    meaningfulQuantity(numberValue(fields[ITEM_VENTA.PESO_CARGADO])) ??
-    meaningfulQuantity(numberValue(fields[ITEM_VENTA.PESO_CONTRATO_BOBINAS])) ??
-    (existenceQuantity || undefined) ??
-    meaningfulQuantity(numberValue(primaryPurchaseFields[ITEM_COMPRA.NETO_CONTRATO])) ??
-    0;
+  const quantity = selectConfirmationQuantity({
+    quantitySource,
+    selectedLoadedQuantity,
+    loadedQuantity: numberValue(fields[ITEM_VENTA.PESO_CARGADO]),
+    contractSaleCoilsQuantity: numberValue(fields[ITEM_VENTA.PESO_CONTRATO_BOBINAS]),
+    existenceQuantity,
+    purchaseContractNetQuantity: numberValue(primaryPurchaseFields[ITEM_COMPRA.NETO_CONTRATO])
+  });
   const materialType = linkedText(
     primaryPurchaseFields[ITEM_COMPRA.TIPO_MATERIAL],
     linkedNames.materialTypes
@@ -541,7 +551,10 @@ async function loadPurchaseOriginByPurchaseItemId(client, purchaseItemRecords) {
 export function getConfirmationLines(confirmation, mode) {
   if (mode === "detail") {
     return confirmation.items.flatMap((item) => {
-      if (!item.existences.length) {
+      if (
+        confirmation.quantitySource === "contract-sale-coils" ||
+        !item.existences.length
+      ) {
         return [
           {
             itemNumber: item.number,
@@ -604,6 +617,68 @@ export function loadedQuantityByCustomerWeightMode(fields, customerWeightMode) {
   const mode = normalizeWeightMode(customerWeightMode) || "bruto";
   if (mode === "bruto") return numberValue(fields[ITEM_VENTA.BRUTO_CARGADO]);
   return numberValue(fields[ITEM_VENTA.NETO_CARGADO]);
+}
+
+export function normalizeQuantitySource(value) {
+  const normalized = normalizeText(value);
+  if (
+    normalized === "contract-sale-coils" ||
+    normalized === "contract sale coils" ||
+    normalized === "contrato venta bobinas" ||
+    normalized === "peso contrato venta bobinas"
+  ) {
+    return "contract-sale-coils";
+  }
+  if (
+    normalized === "assigned-stock" ||
+    normalized === "assigned stock" ||
+    normalized === "existencias asignadas"
+  ) {
+    return "assigned-stock";
+  }
+  return "default";
+}
+
+export function selectConfirmationQuantity({
+  quantitySource,
+  selectedLoadedQuantity,
+  loadedQuantity,
+  contractSaleCoilsQuantity,
+  existenceQuantity,
+  purchaseContractNetQuantity
+}) {
+  const source = normalizeQuantitySource(quantitySource);
+
+  if (source === "contract-sale-coils") {
+    return (
+      meaningfulQuantity(contractSaleCoilsQuantity) ??
+      meaningfulQuantity(selectedLoadedQuantity) ??
+      meaningfulQuantity(loadedQuantity) ??
+      (existenceQuantity || undefined) ??
+      meaningfulQuantity(purchaseContractNetQuantity) ??
+      0
+    );
+  }
+
+  if (source === "assigned-stock") {
+    return (
+      (existenceQuantity || undefined) ??
+      meaningfulQuantity(selectedLoadedQuantity) ??
+      meaningfulQuantity(loadedQuantity) ??
+      meaningfulQuantity(contractSaleCoilsQuantity) ??
+      meaningfulQuantity(purchaseContractNetQuantity) ??
+      0
+    );
+  }
+
+  return (
+    meaningfulQuantity(selectedLoadedQuantity) ??
+    meaningfulQuantity(loadedQuantity) ??
+    meaningfulQuantity(contractSaleCoilsQuantity) ??
+    (existenceQuantity || undefined) ??
+    meaningfulQuantity(purchaseContractNetQuantity) ??
+    0
+  );
 }
 
 export function confirmationTotalQuantity(items, contractQuantity) {

@@ -61,7 +61,8 @@ app.get("/api/invoices/by-number/:invoiceNumber", async (request, reply) => {
 app.get("/api/confirmations/:recordId/metadata", async (request) => {
   const confirmation = await loadConfirmationFromAirtable({
     config,
-    recordId: request.params.recordId
+    recordId: request.params.recordId,
+    quantitySource: request.query.quantitySource
   });
   return {
     recordId: confirmation.recordId,
@@ -82,7 +83,8 @@ app.get("/api/confirmations/:recordId/:filename", async (request, reply) => {
 
   const confirmation = await loadConfirmationFromAirtable({
     config,
-    recordId: request.params.recordId
+    recordId: request.params.recordId,
+    quantitySource: request.query.quantitySource
   });
   const mode = normalizeConfirmationMode(request.query.mode, confirmation);
   return sendRendered(
