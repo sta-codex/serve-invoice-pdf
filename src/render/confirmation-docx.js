@@ -1189,7 +1189,7 @@ function buildSpecialConditionsParagraphs(sourceParagraph, specialConditions) {
     )
   );
 
-  return `${titleParagraph}${bodyParagraph}`;
+  return `${titleParagraph}${bodyParagraph}${halfLineBlankParagraph()}${halfLineBlankParagraph()}`;
 }
 
 function replaceParagraphTextPreservingLineBreaks(paragraph, replacement) {

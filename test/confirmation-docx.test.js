@@ -614,6 +614,10 @@ test("adds optional special conditions before final confirmation paragraph", asy
   assert.ok(bodyIndex > titleIndex);
   assert.ok(finalIndex > bodyIndex);
   assert.match(documentXml, /<w:br\/>/);
+  assert.match(
+    documentXml,
+    /Primera condici[\s\S]*Segunda condici[\s\S]*<w:spacing w:before="0" w:after="0" w:line="120" w:lineRule="exact"\/>[\s\S]*<w:spacing w:before="0" w:after="0" w:line="120" w:lineRule="exact"\/>[\s\S]*Salvo comunicaci/
+  );
 });
 
 test("omits special conditions section when it is empty", async () => {
