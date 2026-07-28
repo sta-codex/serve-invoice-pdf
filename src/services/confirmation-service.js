@@ -1,4 +1,6 @@
 import {
+  ANTICIPO,
+  ANTICIPO_FIELD_IDS,
   CONTRATO_VENTA,
   CONTRATO_VENTA_FIELD_IDS,
   EXISTENCIA,
@@ -122,6 +124,11 @@ export async function loadConfirmationFromAirtable({
   }
 
   const contractFields = fieldsOf(contractRecord);
+  const downPaymentRecords = await client.listRecordsByIds(
+    tables.downPayments,
+    recordIds(contractFields[CONTRATO_VENTA.ANTICIPOS]),
+    ANTICIPO_FIELD_IDS
+  );
   const saleItemIds = recordIds(contractFields[CONTRATO_VENTA.ITEMS]);
   const saleItemRecords = await client.listRecordsByIds(
     tables.saleItems,
@@ -166,6 +173,7 @@ export async function loadConfirmationFromAirtable({
     purchaseItemRecords,
     purchaseOriginByPurchaseItemId,
     existenceRecords,
+    downPaymentRecords,
     linkedNames,
     company: config.company,
     quantitySource
@@ -179,6 +187,7 @@ function normalizeConfirmation({
   purchaseItemRecords,
   purchaseOriginByPurchaseItemId,
   existenceRecords,
+  downPaymentRecords,
   linkedNames,
   company,
   quantitySource
@@ -235,6 +244,7 @@ function normalizeConfirmation({
       fields[CONTRATO_VENTA.TERMINOS_PAGO],
       linkedNames.paymentTerms
     ),
+    downPayments: normalizeDownPayments(downPaymentRecords),
     toleranceMinus: numberValue(fields[CONTRATO_VENTA.TOLERANCIA_MENOS]),
     tolerancePlus: numberValue(fields[CONTRATO_VENTA.TOLERANCIA_MAS]),
     customer: {
@@ -256,6 +266,21 @@ function normalizeConfirmation({
     totalQuantity,
     quantitySource: normalizeQuantitySource(quantitySource)
   };
+}
+
+function normalizeDownPayments(records) {
+  return (records || [])
+    .map((record) => {
+      const fields = fieldsOf(record);
+      return {
+        recordId: record.id,
+        amount: numberValue(fields[ANTICIPO.CANTIDAD]),
+        currency: firstText(fields[ANTICIPO.MONEDA]) || "EUR",
+        date: dateValue(fields[ANTICIPO.FECHA])
+      };
+    })
+    .filter((downPayment) => downPayment.amount)
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
 }
 
 function normalizeSaleItem({

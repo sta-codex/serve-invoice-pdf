@@ -9,6 +9,8 @@ export function getConfig(env = process.env) {
         existencias: env.AIRTABLE_EXISTENCIAS_TABLE_ID || "tblOGE7nApPr8zTsZ",
         salesContracts:
           env.AIRTABLE_CONTRATOS_VENTA_TABLE_ID || "tbly2fHo6evAFY33X",
+        downPayments:
+          env.AIRTABLE_ANTICIPOS_TABLE_ID || "tblqUBpBzyfhGIRnD",
         saleItems: env.AIRTABLE_ITEMS_VENTA_TABLE_ID || "tblmx0d8G49Qx29LD",
         purchaseItems: env.AIRTABLE_ITEMS_COMPRA_TABLE_ID || "tblVZncIvXViG3IvO"
       }

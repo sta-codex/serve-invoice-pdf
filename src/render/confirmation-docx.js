@@ -109,7 +109,7 @@ function buildReplacements(
     ["PESO BOBINA: RANGO DEL ITEM DE COMPRA", ""],
   [
     "CONDICIONES DE PAGO :  LA FORMA DE PAGO DEL PEDIDO",
-    `CONDICIONES DE PAGO: ${confirmation.paymentTerms || ""}`
+    `CONDICIONES DE PAGO: ${formatPaymentTermsLine(confirmation)}`
   ],
   [
     "CAIXA BANK - ES40 2100 6428 2213 0012 3884",
@@ -169,6 +169,46 @@ function formatTotalQuantityLine(confirmation, mode) {
   }
   const tolerance = formatTolerance(confirmation);
   return tolerance ? `${base} ${tolerance}` : base;
+}
+
+function formatPaymentTermsLine(confirmation) {
+  return [confirmation.paymentTerms, formatDownPayments(confirmation.downPayments)]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(". ");
+}
+
+function formatDownPayments(downPayments) {
+  const parts = (downPayments || []).map(formatDownPayment).filter(Boolean);
+  if (!parts.length) return "";
+  return joinNaturalList(parts);
+}
+
+function formatDownPayment(downPayment) {
+  const amount = Number(downPayment?.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return "";
+  const date = formatDateEs(downPayment.date);
+  return `Anticipo de ${formatPaymentAmount(amount, downPayment.currency)}${
+    date ? ` el ${date}` : ""
+  }`;
+}
+
+function formatPaymentAmount(amount, currency = "EUR") {
+  const hasDecimals = Math.round(amount * 100) % 100 !== 0;
+  const formattedAmount = new Intl.NumberFormat("es-ES", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+    useGrouping: true
+  }).format(amount);
+  const normalizedCurrency = String(currency || "EUR").trim().toUpperCase();
+  const symbol = normalizedCurrency === "EUR" ? "\u20ac" : normalizedCurrency;
+  return `${formattedAmount} ${symbol}`;
+}
+
+function joinNaturalList(parts) {
+  if (parts.length <= 1) return parts[0] || "";
+  if (parts.length === 2) return `${parts[0]} y ${parts[1]}`;
+  return `${parts.slice(0, -1).join(", ")} y ${parts[parts.length - 1]}`;
 }
 
 function toPercent(value) {

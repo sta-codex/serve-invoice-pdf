@@ -309,6 +309,48 @@ test("keeps only labels bold in colon-separated paragraphs", async () => {
   assertOnlyLabelBold(documentXml, "RECLAMACIONES:", "Si se encuentran daños");
 });
 
+test("adds down payments to payment terms", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      paymentTerms: "Transferencia",
+      downPayments: [
+        { amount: 100000, currency: "EUR", date: "2026-08-02" }
+      ]
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+
+  assert.match(
+    extractDocumentText(documentXml),
+    /CONDICIONES DE PAGO: Transferencia\. Anticipo de 100\.000 € el 02\/08\/2026/
+  );
+});
+
+test("formats multiple down payments as a natural list", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      paymentTerms: "Transferencia",
+      downPayments: [
+        { amount: 100000, currency: "EUR", date: "2026-08-02" },
+        { amount: 50000.5, currency: "EUR", date: "2026-09-15" },
+        { amount: 25000, currency: "USD", date: "2026-10-01" }
+      ]
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+
+  assert.match(
+    extractDocumentText(documentXml),
+    /Anticipo de 100\.000 € el 02\/08\/2026, Anticipo de 50\.000,50 € el 15\/09\/2026 y Anticipo de 25\.000 USD el 01\/10\/2026/
+  );
+});
+
 test("uses origin column when multiple origins are present", async () => {
   const buffer = await renderConfirmationDocx(
     {

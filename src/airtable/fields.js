@@ -58,6 +58,7 @@ export const CONTRATO_VENTA = {
   TOLERANCIA_MENOS: "fldIGNZFIIW0n5zt5",
   TOLERANCIA_MAS: "fldyvgrgAA0HYgDSn",
   MONEDA: "fldfAYJqypZS9nIlw",
+  ANTICIPOS: "fldW3cX73zzqv5ZPt",
   PAGO: "fldX3lewbUGpXejsL",
   ITEMS: "fldSSpBbTESUG8Z2T",
   DOCUMENTOS_CONFIRMACION: "fld1bqIxDKpu8mEmM",
@@ -70,6 +71,13 @@ export const CONTRATO_VENTA = {
   CLIENTE_NIF: "fldaxgBqeiNKk2K70",
   PESO_POR_CONTRATO: "fldYBGnNy4Nt6U6An",
   TERMINOS_PAGO: "fldvdwoYOJVEHjRrx"
+};
+
+export const ANTICIPO = {
+  ANTICIPO: "fldK8cHyFTTPjT7RQ",
+  FECHA: "fldI9Aj8Bkht9ewZd",
+  CANTIDAD: "fldzH3EEfccOox3F1",
+  MONEDA: "flduV3awBEakmOpdi"
 };
 
 export const ITEM_VENTA = {
@@ -112,5 +120,6 @@ export const ITEM_COMPRA = {
 export const FACTURA_FIELD_IDS = Object.values(FACTURA);
 export const EXISTENCIA_FIELD_IDS = Object.values(EXISTENCIA);
 export const CONTRATO_VENTA_FIELD_IDS = Object.values(CONTRATO_VENTA);
+export const ANTICIPO_FIELD_IDS = Object.values(ANTICIPO);
 export const ITEM_VENTA_FIELD_IDS = Object.values(ITEM_VENTA);
 export const ITEM_COMPRA_FIELD_IDS = Object.values(ITEM_COMPRA);
