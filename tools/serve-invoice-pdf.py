@@ -25,6 +25,7 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 RENDER_SCRIPT = ROOT / "tools" / "render-sales-invoice-pdf.py"
+REASSIGNMENT_MAP_HTML = ROOT / "tools" / "reassignment-map.html"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8787
 FILE_CACHE: dict[str, dict] = {}
@@ -95,6 +96,15 @@ def text_response(handler: BaseHTTPRequestHandler, status: int, body: str) -> No
     handler.send_header("Content-Length", str(len(data)))
     handler.end_headers()
     handler.wfile.write(data)
+
+
+def html_response(handler: BaseHTTPRequestHandler, status: int, body: bytes) -> None:
+    handler.send_response(status)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.send_header("Cache-Control", "public, max-age=300")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
 
 
 def read_json_body(handler: BaseHTTPRequestHandler) -> dict:
@@ -565,6 +575,12 @@ class Handler(BaseHTTPRequestHandler):
                 },
             )
             return
+        if parsed.path == "/airtable/reassignment-map":
+            if not REASSIGNMENT_MAP_HTML.exists():
+                text_response(self, HTTPStatus.NOT_FOUND, "Reassignment map not found")
+                return
+            html_response(self, HTTPStatus.OK, REASSIGNMENT_MAP_HTML.read_bytes())
+            return
         if parsed.path.startswith("/files/"):
             clean_file_cache(config)
             key = parsed.path.removeprefix("/files/")
@@ -700,6 +716,7 @@ def main() -> int:
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"STA invoice PDF service listening on http://{host}:{port}")
     print("GET  /health")
+    print("GET  /airtable/reassignment-map")
     print("GET  /invoice.pdf?invoice=2025-192")
     print("POST /airtable/invoices/generate")
     print("POST /airtable/invoices/render")

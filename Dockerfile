@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY tools/render-sales-invoice-pdf.py tools/render-sales-invoice-pdf.py
 COPY tools/serve-invoice-pdf.py tools/serve-invoice-pdf.py
+COPY tools/reassignment-map.html tools/reassignment-map.html
 
 ENV STA_INVOICE_UPLOAD=false
 ENV STA_INVOICE_CACHE_TTL_SECONDS=900

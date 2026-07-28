@@ -37,6 +37,7 @@ Endpoints:
 
 ```txt
 GET /health
+GET /airtable/reassignment-map#<base64url-payload>
 GET /api/invoices/:recordId?mode=grouped
 GET /api/invoices/:recordId?mode=detail
 GET /api/invoices/by-number/:invoiceNumber?mode=grouped

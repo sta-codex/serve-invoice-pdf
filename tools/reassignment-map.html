@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Mapa de reasignacion de bobinas</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202428;
+      --muted: #667078;
+      --line: #cfd5d8;
+      --surface: #ffffff;
+      --page: #f3f5f5;
+      --brand: #7a0019;
+      --brand-soft: #f7e9ed;
+      --green: #176c48;
+      --green-soft: #e5f4ed;
+      --blue: #1d5e87;
+      --blue-soft: #e8f2f8;
+      --amber: #8a5b00;
+      --amber-soft: #fff3d7;
+      --danger: #a52a2a;
+      --danger-soft: #fdeaea;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    button, input { font: inherit; letter-spacing: 0; }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+      border-bottom: 3px solid var(--brand);
+      padding-bottom: 18px;
+    }
+
+    .brand {
+      color: var(--brand);
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 5px 0 0;
+      font-size: clamp(25px, 4vw, 38px);
+      line-height: 1.1;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      border: 1px solid currentColor;
+      border-radius: 6px;
+      padding: 7px 11px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .status.applied { color: var(--green); background: var(--green-soft); }
+    .status.reverted { color: var(--blue); background: var(--blue-soft); }
+    .status.blocked { color: var(--danger); background: var(--danger-soft); }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1px;
+      margin: 20px 0;
+      border: 1px solid var(--line);
+      background: var(--line);
+    }
+
+    .metric {
+      min-width: 0;
+      background: var(--surface);
+      padding: 14px 16px;
+    }
+
+    .metric strong {
+      display: block;
+      overflow-wrap: anywhere;
+      font-size: 20px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .toolbar input {
+      width: min(420px, 100%);
+      min-height: 38px;
+      border: 1px solid #aeb7bc;
+      border-radius: 5px;
+      background: var(--surface);
+      padding: 8px 11px;
+    }
+
+    .toolbar-actions { display: flex; gap: 8px; }
+
+    button {
+      min-height: 38px;
+      border: 1px solid #aeb7bc;
+      border-radius: 5px;
+      background: var(--surface);
+      color: var(--ink);
+      padding: 8px 11px;
+      cursor: pointer;
+    }
+
+    button:hover { border-color: var(--brand); color: var(--brand); }
+
+    .notice {
+      margin: 14px 0;
+      border-left: 4px solid var(--amber);
+      background: var(--amber-soft);
+      padding: 12px 14px;
+    }
+
+    .notice.error {
+      border-left-color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .notice strong { display: block; margin-bottom: 5px; }
+    .notice ul { margin: 0; padding-left: 20px; }
+
+    .movement {
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .movement[open] { border-color: #aeb7bc; }
+
+    .movement summary {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      gap: 11px;
+      align-items: center;
+      min-height: 64px;
+      padding: 10px 14px;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .movement summary::-webkit-details-marker { display: none; }
+
+    .index {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--brand);
+      color: white;
+      font-weight: 800;
+    }
+
+    .stock-title {
+      min-width: 0;
+      font-size: 16px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .stock-meta {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .movement-kind {
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .tree {
+      border-top: 1px solid var(--line);
+      padding: 18px;
+    }
+
+    .route {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr);
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      color: var(--brand);
+      font-size: 25px;
+      font-weight: 800;
+    }
+
+    .branch {
+      min-width: 0;
+      border-left: 4px solid var(--line);
+      padding: 2px 0 2px 14px;
+    }
+
+    .branch.target { border-left-color: var(--green); }
+    .branch.compensation { border-left-color: var(--blue); }
+
+    .branch-title {
+      margin-bottom: 9px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .node {
+      position: relative;
+      margin: 7px 0;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #fbfcfc;
+      padding: 9px 11px;
+      overflow-wrap: anywhere;
+    }
+
+    .node::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: -18px;
+      width: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .node small {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .node.target-node {
+      border-color: #9acbb6;
+      background: var(--green-soft);
+    }
+
+    .node.replacement-node {
+      border-color: #a8cada;
+      background: var(--blue-soft);
+    }
+
+    .compensation-wrap {
+      margin-top: 18px;
+      border-top: 1px dashed #aeb7bc;
+      padding-top: 18px;
+    }
+
+    .compensation-heading {
+      margin: 0 0 12px;
+      font-size: 15px;
+    }
+
+    .compensation-route {
+      display: grid;
+      grid-template-columns: minmax(180px, .8fr) 34px minmax(0, 1.2fr);
+      gap: 8px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .empty {
+      border: 1px dashed #aeb7bc;
+      background: var(--surface);
+      padding: 30px;
+      text-align: center;
+    }
+
+    .hidden { display: none; }
+
+    @media (max-width: 720px) {
+      .shell { width: min(100% - 20px, 1180px); padding-top: 18px; }
+      header { grid-template-columns: 1fr; align-items: start; }
+      .status { justify-self: start; }
+      .summary { grid-template-columns: 1fr; }
+      .toolbar { align-items: stretch; flex-direction: column; }
+      .toolbar input { width: 100%; }
+      .toolbar-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .movement summary { grid-template-columns: 38px minmax(0, 1fr); }
+      .movement-kind { grid-column: 2; }
+      .route, .compensation-route { grid-template-columns: 1fr; }
+      .arrow { min-height: 34px; transform: rotate(90deg); }
+    }
+
+    @media print {
+      body { background: white; }
+      .shell { width: 100%; padding: 0; }
+      .toolbar { display: none; }
+      .movement { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <div class="brand">Steel Trade Advisors</div>
+        <h1 id="title">Mapa de reasignacion</h1>
+      </div>
+      <div id="status" class="status">Cargando</div>
+    </header>
+
+    <section id="summary" class="summary" aria-label="Resumen"></section>
+    <section id="notices"></section>
+
+    <div class="toolbar">
+      <input id="filter" type="search" placeholder="Buscar bobina, item o transporte" aria-label="Buscar movimientos">
+      <div class="toolbar-actions">
+        <button id="expand" type="button">Expandir todo</button>
+        <button id="print" type="button">Imprimir</button>
+      </div>
+    </div>
+
+    <section id="movements" aria-live="polite"></section>
+  </main>
+
+  <script>
+    (() => {
+      const statusLabels = {
+        applied: "Cambios aplicados",
+        reverted: "Movimientos revertidos",
+        blocked: "Plan bloqueado, sin cambios"
+      };
+
+      const decodePayload = () => {
+        const encoded = location.hash.slice(1);
+        if (!encoded) throw new Error("El enlace no contiene datos de movimientos.");
+        const padded = encoded.replace(/-/g, "+").replace(/_/g, "/") +
+          "=".repeat((4 - encoded.length % 4) % 4);
+        const binary = atob(padded);
+        const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+        return JSON.parse(new TextDecoder().decode(bytes));
+      };
+
+      const element = (tag, className, text) => {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined && text !== null) node.textContent = text;
+        return node;
+      };
+
+      const stockMeta = stock => {
+        if (!stock) return "";
+        const parts = [];
+        if (Number.isFinite(stock.gross)) parts.push(`${stock.gross.toFixed(3)} t bruto`);
+        if (stock.location) parts.push(stock.location);
+        return parts.join(" | ");
+      };
+
+      const addNode = (parent, type, value, className = "") => {
+        if (!value) return;
+        const node = element("div", `node ${className}`.trim());
+        node.append(element("small", "", type));
+        node.append(document.createTextNode(value.label || value));
+        parent.append(node);
+      };
+
+      const addLabels = (parent, type, values) => {
+        (values || []).forEach(value => addNode(parent, type, value));
+      };
+
+      const renderNotices = payload => {
+        const root = document.querySelector("#notices");
+        const groups = [
+          ["Errores", payload.errors, "notice error"],
+          ["Avisos", payload.warnings, "notice"]
+        ];
+        groups.forEach(([title, messages, className]) => {
+          if (!messages || !messages.length) return;
+          const box = element("div", className);
+          box.append(element("strong", "", title));
+          const list = element("ul");
+          messages.forEach(message => list.append(element("li", "", message)));
+          box.append(list);
+          root.append(box);
+        });
+      };
+
+      const renderCompensation = (movement, tree) => {
+        if (!movement.displaced && !(movement.compensations || []).length) return;
+        const wrap = element("section", "compensation-wrap");
+        wrap.append(element("h2", "compensation-heading", "Compensacion del pedido de origen"));
+
+        const compensations = movement.compensations && movement.compensations.length
+          ? movement.compensations
+          : [{ replacement: movement.displaced, saleItem: null, transports: [] }];
+
+        compensations.forEach(compensation => {
+          const route = element("div", "compensation-route");
+          const replacementBranch = element("div", "branch compensation");
+          replacementBranch.append(element("div", "branch-title", "Bobina liberada"));
+          const replacement = compensation.replacement || movement.displaced;
+          if (replacement) {
+            addNode(replacementBranch, "Existencia sustituta", replacement, "replacement-node");
+            const meta = stockMeta(replacement);
+            if (meta) replacementBranch.append(element("div", "stock-meta", meta));
+          }
+
+          route.append(replacementBranch);
+          route.append(element("div", "arrow", "→"));
+
+          const destination = element("div", "branch compensation");
+          destination.append(element("div", "branch-title", "Pasa a ocupar el hueco"));
+          addNode(destination, "Item de venta", compensation.saleItem, "replacement-node");
+          addLabels(destination, "Transporte", compensation.transports);
+          if (!compensation.saleItem) {
+            destination.append(element("div", "node", "No se pudo completar la compensacion."));
+          }
+          route.append(destination);
+          wrap.append(route);
+        });
+        tree.append(wrap);
+      };
+
+      const renderMovement = (movement, index) => {
+        const details = element("details", "movement");
+        details.open = true;
+        const summary = element("summary");
+        summary.append(element("span", "index", String(index + 1)));
+
+        const titleWrap = element("div");
+        titleWrap.append(element("div", "stock-title", movement.actual?.label || "Existencia"));
+        titleWrap.append(element("div", "stock-meta", stockMeta(movement.actual)));
+        summary.append(titleWrap);
+        summary.append(element("span", "movement-kind", "Bobina definitiva"));
+        details.append(summary);
+
+        const tree = element("div", "tree");
+        const route = element("div", "route");
+
+        const before = element("div", "branch");
+        before.append(element("div", "branch-title", "Antes de la reasignacion"));
+        addLabels(before, "Item de venta", movement.before?.saleItems);
+        addLabels(before, "Transporte", movement.before?.transports);
+        if (!(movement.before?.saleItems || []).length && !(movement.before?.transports || []).length) {
+          before.append(element("div", "node", "Sin asignacion comercial anterior."));
+        }
+
+        const target = element("div", "branch target");
+        target.append(element("div", "branch-title", "Destino dictado por el albaran"));
+        addNode(target, "Item de venta", movement.target?.saleItem, "target-node");
+        addNode(target, "Transporte", movement.target?.transport, "target-node");
+
+        route.append(before);
+        route.append(element("div", "arrow", "→"));
+        route.append(target);
+        tree.append(route);
+        renderCompensation(movement, tree);
+        details.append(tree);
+
+        const searchable = JSON.stringify(movement).toLocaleLowerCase("es");
+        details.dataset.search = searchable;
+        return details;
+      };
+
+      const render = payload => {
+        document.title = `${payload.deliveryNote || "Albaran"} | Mapa de reasignacion`;
+        document.querySelector("#title").textContent = payload.deliveryNote || "Mapa de reasignacion";
+
+        const status = document.querySelector("#status");
+        status.textContent = statusLabels[payload.status] || payload.status || "Resultado";
+        status.className = `status ${payload.status || ""}`;
+
+        const movements = payload.movements || [];
+        const compensationCount = movements.reduce(
+          (total, movement) => total + (movement.compensations || []).length,
+          0
+        );
+        const metrics = [
+          [movements.length, "Bobinas definitivas"],
+          [compensationCount, "Compensaciones"],
+          [payload.scriptVersion || "-", "Version del script"]
+        ];
+        const summary = document.querySelector("#summary");
+        metrics.forEach(([value, label]) => {
+          const metric = element("div", "metric");
+          metric.append(element("strong", "", String(value)));
+          metric.append(element("span", "", label));
+          summary.append(metric);
+        });
+
+        renderNotices(payload);
+        const root = document.querySelector("#movements");
+        if (!movements.length) {
+          root.append(element("div", "empty", "No hay movimientos que representar."));
+        } else {
+          movements.forEach((movement, index) => root.append(renderMovement(movement, index)));
+        }
+
+        document.querySelector("#filter").addEventListener("input", event => {
+          const query = event.target.value.trim().toLocaleLowerCase("es");
+          document.querySelectorAll(".movement").forEach(item => {
+            item.classList.toggle("hidden", query && !item.dataset.search.includes(query));
+          });
+        });
+        document.querySelector("#expand").addEventListener("click", () => {
+          const items = [...document.querySelectorAll(".movement:not(.hidden)")];
+          const shouldOpen = items.some(item => !item.open);
+          items.forEach(item => { item.open = shouldOpen; });
+          document.querySelector("#expand").textContent =
+            shouldOpen ? "Contraer todo" : "Expandir todo";
+        });
+        document.querySelector("#print").addEventListener("click", () => window.print());
+      };
+
+      try {
+        render(decodePayload());
+      } catch (error) {
+        document.querySelector("#status").textContent = "Enlace no valido";
+        document.querySelector("#status").className = "status blocked";
+        document.querySelector("#movements").append(
+          element("div", "empty", error.message || "No se pudo abrir el mapa.")
+        );
+      }
+    })();
+  </script>
+</body>
+</html>
