@@ -343,8 +343,14 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     weight_start_col = col_count - 1 if weight_mode == "net" else col_count
 
     header_fill = PatternFill("solid", fgColor="7A0019")
-    total_fill = PatternFill("solid", fgColor="EDEDED")
-    group_fill = PatternFill("solid", fgColor="F5E3E8")
+    total_fill = PatternFill("solid", fgColor="A43052")
+    group_fill = PatternFill("solid", fgColor="BE737E")
+    logo_fills = [
+        PatternFill("solid", fgColor="BE737E"),
+        PatternFill("solid", fgColor="A43052"),
+        PatternFill("solid", fgColor="741C35"),
+        PatternFill("solid", fgColor="4D0919"),
+    ]
     thin_side = Side(style="thin", color="D5D5D5")
     header_side = Side(style="thin", color="6C0016")
     border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
@@ -354,6 +360,7 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     body_font = Font(name="Arial", size=9)
     white_bold = Font(name="Arial", size=8, color="FFFFFF", bold=True)
     bold = Font(name="Arial", size=9, bold=True)
+    total_font = Font(name="Arial", size=9, color="FFFFFF", bold=True)
     top_alignment = Alignment(vertical="center", horizontal="left", wrap_text=False, shrink_to_fit=True)
 
     ws.cell(
@@ -365,20 +372,20 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     ws.row_dimensions[1].height = 4
     for top_row in range(2, 7):
         ws.row_dimensions[top_row].height = 15
-    set_merged_value(ws, 2, 3, 8, "STEEL TRADE ADVISORS, S.L.U.", title_font, top_alignment)
-    set_merged_value(ws, 3, 3, 8, "C/ Almirante, n\u00ba 22, 5A", small_font, top_alignment)
-    set_merged_value(ws, 4, 3, 8, "28004 Madrid, Espa\u00f1a", small_font, top_alignment)
-    set_merged_value(ws, 5, 3, 8, "+34 91 068 82 77", small_font, top_alignment)
-    set_merged_value(ws, 6, 3, 8, "CIF: B88047790", small_font, top_alignment)
+    for row, fill in zip(range(2, 6), logo_fills):
+        ws.merge_cells(start_row=row, start_column=3, end_row=row, end_column=4)
+        ws.cell(row=row, column=3).fill = fill
+    set_merged_value(ws, 2, 5, 9, "Steel Trade Advisors, S.L.U.", title_font, top_alignment)
+    set_merged_value(ws, 3, 5, 9, "C/ Almirante, n\u00ba 22, 5A", small_font, top_alignment)
+    set_merged_value(ws, 4, 5, 9, "28004 Madrid, Espa\u00f1a", small_font, top_alignment)
+    set_merged_value(ws, 5, 5, 9, "+34 91 068 82 77", small_font, top_alignment)
+    set_merged_value(ws, 6, 5, 9, "CIF: B88047790", small_font, top_alignment)
     customer_col = min(10, col_count)
     for offset, line in enumerate(invoice.customer_lines[:5], start=2):
         font = bold if offset == 2 else small_font
         set_merged_value(ws, offset, customer_col, col_count, line, font, top_alignment)
 
-    packing_text = " / ".join(getattr(invoice, "packing_lists", []) or [])
-    description = packing_text or invoice.category
-    if invoice.invoice_id:
-        description = f"{description} ({RENDERER.document_header_label(invoice)}: {invoice.invoice_id})"
+    description = f"Commercial Invoice Detail Number: {invoice.invoice_id}"
     ws.cell(row=8, column=3, value=description)
     ws.merge_cells(start_row=8, start_column=3, end_row=8, end_column=max(3, col_count - 1))
     ws.cell(row=8, column=col_count, value=invoice.date_text)
@@ -423,7 +430,7 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         col_count,
         weight_start_col=weight_start_col,
         fill=total_fill,
-        font=bold,
+        font=total_font,
         border=border,
     )
 
@@ -476,9 +483,10 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
                 cell.number_format = "0.000" if cell.column >= weight_start_col else "0"
     ws.freeze_panes = "C12"
     ws.sheet_view.showGridLines = False
-    ws.oddFooter.center.text = RENDERER.REGISTRY_LINE
-    ws.evenFooter.center.text = RENDERER.REGISTRY_LINE
-    ws.firstFooter.center.text = RENDERER.REGISTRY_LINE
+    registry_footer = f'&"Arial"&6&K888888{RENDERER.REGISTRY_LINE}'
+    ws.oddFooter.center.text = registry_footer
+    ws.evenFooter.center.text = registry_footer
+    ws.firstFooter.center.text = registry_footer
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
     ws.page_setup.orientation = "landscape"
