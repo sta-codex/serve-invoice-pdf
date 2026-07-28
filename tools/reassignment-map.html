@@ -113,6 +113,15 @@
       pointer-events: none;
       overflow: visible;
     }
+    .connection-path {
+      opacity: .25;
+      transition: opacity 140ms ease, stroke-width 140ms ease;
+    }
+    .diagram.is-filtering .connection-path { opacity: .06; }
+    .diagram.is-filtering .connection-path.highlighted {
+      opacity: 1;
+      stroke-width: 4;
+    }
     .state {
       position: relative;
       z-index: 2;
@@ -165,8 +174,16 @@
       border-radius: 4px;
       background: var(--surface);
       padding: 9px;
+      transition: outline-color 140ms ease, box-shadow 140ms ease;
     }
     .sale-item.target { border-top-color: var(--brand); }
+    .sale-item:hover,
+    .sale-item:focus-visible,
+    .sale-item.related-item {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+      box-shadow: 0 2px 8px rgba(23, 101, 143, .2);
+    }
     .item-name {
       min-height: 34px;
       margin: 0 0 8px;
@@ -279,7 +296,6 @@
     <div id="summary" class="summary"></div>
     <div id="notices"></div>
     <div class="legend">
-      <span><i class="line-key delivery"></i> El albaran declara esta bobina</span>
       <span><i class="line-key"></i> La bobina cambia de item</span>
     </div>
     <div class="diagram-scroll">
@@ -403,7 +419,8 @@
         const rest = Number.isFinite(item.otherStockCount)
           ? `Resto de existencias (${item.otherStockCount})`
           : "Resto no disponible";
-        return `<article class="sale-item ${item.role === "target" ? "target" : ""}">
+        return `<article class="sale-item ${item.role === "target" ? "target" : ""}"
+          data-item-id="${escapeHtml(item.id)}" tabindex="0">
           <h3 class="item-name">${escapeHtml(item.label)}</h3>
           <div class="coils">
             ${stocks.length
@@ -471,7 +488,7 @@
         }
       }
 
-      function drawPath(svg, start, end, className, marker) {
+      function drawPath(svg, start, end, className, marker, metadata = {}) {
         const delta = Math.max(55, Math.abs(end.y - start.y) * .38);
         const direction = end.y >= start.y ? 1 : -1;
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -482,6 +499,9 @@
         path.setAttribute("fill", "none");
         path.setAttribute("class", className);
         path.setAttribute("marker-end", `url(#${marker})`);
+        path.dataset.fromItem = metadata.fromItem || "";
+        path.dataset.toItem = metadata.toItem || "";
+        path.dataset.stockId = metadata.stockId || "";
         svg.append(path);
       }
 
@@ -493,7 +513,7 @@
         };
       }
 
-      function drawConnections(payload, changedIds) {
+      function drawConnections(payload, changedIds, beforeOwners, afterOwners) {
         const diagram = document.getElementById("diagram");
         const svg = diagram.querySelector(".connections");
         if (!svg) return;
@@ -518,8 +538,13 @@
             svg,
             point(before, diagramRect, "bottom"),
             point(after, diagramRect, "top"),
-            "movement-path",
-            "movement-arrow"
+            "connection-path movement-path",
+            "movement-arrow",
+            {
+              fromItem: beforeOwners.get(stockId),
+              toItem: afterOwners.get(stockId),
+              stockId,
+            }
           );
         }
 
@@ -533,11 +558,50 @@
           if (!stockNode) continue;
           drawPath(
             svg,
-            point(deliveryNode, diagramRect, "top"),
-            point(stockNode, diagramRect, "bottom"),
-            "delivery-path",
-            "delivery-arrow"
+            point(deliveryNode, diagramRect, "bottom"),
+            point(stockNode, diagramRect, "top"),
+            "connection-path delivery-path",
+            "delivery-arrow",
+            {
+              fromItem: beforeOwners.get(stockId),
+              toItem: afterOwners.get(stockId),
+              stockId,
+            }
           );
+        }
+      }
+
+      function highlightItem(diagram, itemId) {
+        diagram.classList.add("is-filtering");
+        for (const item of diagram.querySelectorAll("[data-item-id]")) {
+          item.classList.toggle("related-item", item.dataset.itemId === itemId);
+        }
+        for (const path of diagram.querySelectorAll(".connection-path")) {
+          path.classList.toggle(
+            "highlighted",
+            path.dataset.fromItem === itemId || path.dataset.toItem === itemId
+          );
+        }
+      }
+
+      function clearItemHighlight(diagram) {
+        diagram.classList.remove("is-filtering");
+        diagram.querySelectorAll(".related-item")
+          .forEach((item) => item.classList.remove("related-item"));
+        diagram.querySelectorAll(".connection-path.highlighted")
+          .forEach((path) => path.classList.remove("highlighted"));
+      }
+
+      function bindItemHighlights(diagram) {
+        for (const item of diagram.querySelectorAll("[data-item-id]")) {
+          item.addEventListener("mouseenter", () =>
+            highlightItem(diagram, item.dataset.itemId)
+          );
+          item.addEventListener("mouseleave", () => clearItemHighlight(diagram));
+          item.addEventListener("focus", () =>
+            highlightItem(diagram, item.dataset.itemId)
+          );
+          item.addEventListener("blur", () => clearItemHighlight(diagram));
         }
       }
 
@@ -582,25 +646,31 @@
               </marker>
             </defs>
             <style>
-              .movement-path { stroke: #17658f; stroke-width: 2.5; opacity: .72; }
-              .delivery-path { stroke: #7a0019; stroke-width: 2; stroke-dasharray: 6 4; opacity: .72; }
+              .movement-path { stroke: #17658f; stroke-width: 2.5; }
+              .delivery-path { stroke: #7a0019; stroke-width: 2; stroke-dasharray: 6 4; }
             </style>
           </svg>
-          ${stateHtml("Antes", "Asignacion previa", "before", items, assignments.before, deliveryIds, changedIds)}
           <div class="delivery-zone">
             <div class="delivery-node">
               Albaran ${escapeHtml(payload.deliveryNote || "")}
               ${transport ? `<small>${escapeHtml(transport)}</small>` : ""}
             </div>
           </div>
+          ${stateHtml("Antes", "Asignacion previa", "before", items, assignments.before, deliveryIds, changedIds)}
           <div class="divider">Reasignacion</div>
           ${stateHtml(resultTitle, resultNote, "after", items, assignments.after, deliveryIds, changedIds)}`;
 
-        requestAnimationFrame(() => drawConnections(payload, changedIds));
+        bindItemHighlights(document.getElementById("diagram"));
+        requestAnimationFrame(() =>
+          drawConnections(payload, changedIds, beforeOwners, afterOwners)
+        );
         let resizeTimer;
         window.addEventListener("resize", () => {
           clearTimeout(resizeTimer);
-          resizeTimer = setTimeout(() => drawConnections(payload, changedIds), 80);
+          resizeTimer = setTimeout(
+            () => drawConnections(payload, changedIds, beforeOwners, afterOwners),
+            80
+          );
         });
       }
 
