@@ -463,12 +463,11 @@ test("keeps legal common nouns in normal Spanish lowercase", async () => {
   const documentXml = await doc.file("word/document.xml").async("string");
   const text = extractDocumentText(documentXml);
 
-  assert.match(text, /fuerza mayor/);
+  assert.match(text, /\nFuerza mayor es el evento imprevisto/);
   assert.match(text, /comprador/);
   assert.match(text, /vendedor/);
   assert.match(text, /bienes/);
   assert.doesNotMatch(text, /\bFuerza Mayor\b/);
-  assert.doesNotMatch(text, /\bFuerza mayor\b/);
   assert.doesNotMatch(text, /\bParte\b/);
   assert.doesNotMatch(text, /\bPartes\b/);
   assert.doesNotMatch(text, /\bAcuerdo\b/);

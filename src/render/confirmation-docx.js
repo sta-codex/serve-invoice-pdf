@@ -1046,8 +1046,7 @@ function replaceDocumentCertificateLine(xml) {
 function normalizeLegalCommonNouns(xml) {
   return replaceTextInParagraphs(xml, (text) =>
     text
-      .replace(/\bFuerza Mayor\b/g, "fuerza mayor")
-      .replace(/\bFuerza mayor\b/g, "fuerza mayor")
+      .replace(/\bFuerza Mayor\b/g, "Fuerza mayor")
       .replace(/\bPartes\b/g, "partes")
       .replace(/\bParte\b/g, "parte")
       .replace(/\bAcuerdo\b/g, "acuerdo")
