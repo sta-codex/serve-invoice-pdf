@@ -499,6 +499,29 @@ def fmt_measure_text(value: str) -> str:
     return re.sub(r"(?<=\d)\.(?=\d)", ",", text)
 
 
+def fmt_thickness_text(value: str) -> str:
+    text = clean_text(value)
+    if not text:
+        return ""
+    normalized = text.replace(",", ".")
+    try:
+        parsed = float(normalized)
+    except ValueError:
+        return fmt_measure_text(text)
+    return fmt_decimal(parsed, 2, False)
+
+
+def normalize_thickness_in_measure(value: str) -> str:
+    text = fmt_measure_text(value)
+    return re.sub(
+        r"(\d+(?:[,.]\d+)?)\s*x\s*\d+",
+        lambda match: f"{fmt_thickness_text(match.group(1))}{match.group(0)[len(match.group(1)):]}",
+        text,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+
+
 def clean_delivery_place(value: str) -> str:
     text = clean_invoice_phrase(value)
     if " - " in text:
@@ -521,7 +544,9 @@ def format_delivery_terms(incoterm: str, delivery_places: list[str]) -> str:
     qualifier = parts[1].strip() if len(parts) > 1 else ""
     if code == "DDP":
         first_place = places[0]
-        if qualifier and first_place.upper().startswith(qualifier.upper()):
+        if qualifier.lower() == "cliente":
+            primary = f"{code} {first_place}"
+        elif qualifier and first_place.upper().startswith(qualifier.upper()):
             primary = f"{code} {first_place}"
         else:
             primary = f"{incoterm_text} {first_place}"
@@ -577,8 +602,13 @@ def bank_line_for(invoice: InvoiceData) -> str:
 def combine_dimensions(thickness: str, width: str, length: str, fallback: str = "") -> str:
     parts = [str(part or "").strip() for part in [thickness, width, length]]
     if any(parts):
-        return "x".join(part for part in parts if part)
-    return fallback
+        formatted = [
+            fmt_thickness_text(parts[0]) if index == 0 else fmt_measure_text(part)
+            for index, part in enumerate(parts)
+            if part
+        ]
+        return "x".join(formatted)
+    return normalize_thickness_in_measure(fallback)
 
 
 def line_item_label(line: Line) -> str:
@@ -587,6 +617,56 @@ def line_item_label(line: Line) -> str:
 
 def line_characteristics(line: Line) -> str:
     return " ".join(unique_texts([line.quality, line.coating, line.finish, line.color]))
+
+
+def clean_ship_name(value: str) -> str:
+    return re.sub(r"^\s*MV\s+", "", clean_text(value), flags=re.IGNORECASE)
+
+
+def clean_packing_text(value: str) -> str:
+    text = clean_text(value)
+    text = re.sub(r"\bMV\s+MV\b", "MV", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+-\s+", " - ", text)
+    return text
+
+
+def compose_packing(packing: str, ship: str) -> str:
+    packing_text = clean_packing_text(packing)
+    ship_text = clean_ship_name(ship)
+    if not ship_text:
+        return packing_text
+    if ship_text.upper() in packing_text.upper():
+        return clean_packing_text(packing_text)
+    return clean_packing_text(f"{packing_text} - MV {ship_text}" if packing_text else f"MV {ship_text}")
+
+
+def detail_description(line: Line) -> str:
+    main = " ".join(
+        unique_texts(
+            [
+                line.material,
+                normalize_thickness_in_measure(line.dimensions),
+                line_characteristics(line),
+                line.factory_id,
+            ]
+        )
+    )
+    packing = clean_packing_text(line.packing)
+    return " - ".join(part for part in [main, packing] if part)
+
+
+def detail_description_parts(line: Line) -> tuple[str, str]:
+    main = " ".join(
+        unique_texts(
+            [
+                line.material,
+                normalize_thickness_in_measure(line.dimensions),
+                line_characteristics(line),
+                line.factory_id,
+            ]
+        )
+    )
+    return main, clean_packing_text(line.packing)
 
 
 def unique_texts(values_to_check: list[str]) -> list[str]:
@@ -853,16 +933,16 @@ def build_invoice_from_payload(
         thickness = scalar_text(item.get("thickness"))
         width = scalar_text(item.get("width"))
         length = scalar_text(item.get("length"))
-        dimensions = scalar_text(item.get("dimensions")) or combine_dimensions(
-            thickness, width, length
-        )
+        dimensions = normalize_thickness_in_measure(
+            scalar_text(item.get("dimensions"))
+        ) or combine_dimensions(thickness, width, length)
         lines.append(
             Line(
                 material=scalar_text(item.get("material")),
                 dimensions=dimensions,
                 quality=scalar_text(item.get("quality")),
                 factory_id=scalar_text(item.get("factoryId")),
-                packing=scalar_text(item.get("packing")),
+                packing=clean_packing_text(scalar_text(item.get("packing"))),
                 quantity=scalar_number(item.get("quantity")),
                 price=scalar_number(item.get("price")),
                 amount=scalar_number(item.get("amount")),
@@ -1005,9 +1085,9 @@ def build_invoice_from_records(
         thickness = scalar_text(get_field(existencia, EXISTENCIA["espesor"]))
         width = scalar_text(get_field(existencia, EXISTENCIA["ancho"]))
         length = scalar_text(get_field(existencia, EXISTENCIA["largo"]))
-        dimensions = scalar_text(get_field(existencia, EXISTENCIA["eal"])) or combine_dimensions(
-            thickness, width, length
-        )
+        dimensions = normalize_thickness_in_measure(
+            scalar_text(get_field(existencia, EXISTENCIA["eal"]))
+        ) or combine_dimensions(thickness, width, length)
         quality = scalar_text(get_field(existencia, EXISTENCIA["calidad"])) or scalar_text(
             get_field(existencia, EXISTENCIA["crac"])
         )
@@ -1015,7 +1095,7 @@ def build_invoice_from_records(
             description = scalar_text(get_field(existencia, EXISTENCIA["descripcion"]))
             if "|" in description:
                 left, right = [part.strip() for part in description.split("|", 1)]
-                dimensions = dimensions or right
+                dimensions = dimensions or normalize_thickness_in_measure(right)
                 if material_code and left.startswith(material_code):
                     quality = quality or left[len(material_code) :].strip()
                 else:
@@ -1023,9 +1103,7 @@ def build_invoice_from_records(
         ship = linked_text(
             get_field(existencia, EXISTENCIA["barco"]), barcos, BARCO["nombre"], ""
         )
-        packing = scalar_text(get_field(existencia, EXISTENCIA["pl"]))
-        if ship and ship.upper() not in packing.upper():
-            packing = f"{packing} - MV {ship}" if packing else f"MV {ship}"
+        packing = compose_packing(scalar_text(get_field(existencia, EXISTENCIA["pl"])), ship)
         quantity = scalar_number(get_field(existencia, EXISTENCIA["peso"]))
         price = scalar_number(get_field(existencia, EXISTENCIA["precio_venta"]))
         amount = scalar_number(get_field(existencia, EXISTENCIA["valor_venta"]))
@@ -1322,6 +1400,38 @@ def draw_wrapped_center(
         c.drawCentredString(x + width / 2, y - 4.7, fit_text(c, lines[1], width, font, size))
 
 
+def draw_wrapped_left(
+    c: canvas.Canvas,
+    text: str,
+    x: float,
+    y: float,
+    width: float,
+    font: str,
+    size: float,
+    max_lines: int = 2,
+) -> None:
+    words = clean_text(text).split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if c.stringWidth(candidate, font, size) <= width or not current:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+        if len(lines) >= max_lines:
+            break
+    if current and len(lines) < max_lines:
+        lines.append(current)
+    if not lines:
+        return
+    c.setFont(font, size)
+    line_gap = size + 1.0
+    for index, line in enumerate(lines[:max_lines]):
+        c.drawString(x, y - index * line_gap, fit_text(c, line, width, font, size))
+
+
 def draw_logo(c: canvas.Canvas, x: float, y: float, scale: float = 1.0) -> None:
     palette = [
         colors.HexColor("#be737e"),
@@ -1369,14 +1479,14 @@ def draw_header(c: canvas.Canvas, invoice: InvoiceData) -> None:
         customer_y -= customer_gap
 
 
-def table_layout(show_summary: bool) -> dict[str, float]:
+def table_layout(show_summary: bool, mode: str = "detail") -> dict[str, float]:
     page_w, _ = A4
     x = 38.0
     table_w = page_w - 76.0
     desc_w = 326.0
     qty_w = 62.0
     price_w = 56.0
-    row_h = 12.0
+    row_h = 15.0 if mode == "detail" else 12.0
     y_top = 690.0
     y_bottom = 182.0 if show_summary else 70.0
     header_h = 13.0
@@ -1401,9 +1511,9 @@ def table_layout(show_summary: bool) -> dict[str, float]:
     }
 
 
-def paginate_lines(lines: list[Line]) -> list[tuple[list[Line], bool]]:
-    final_capacity = int(table_layout(True)["capacity"])
-    page_capacity = int(table_layout(False)["capacity"])
+def paginate_lines(lines: list[Line], mode: str) -> list[tuple[list[Line], bool]]:
+    final_capacity = int(table_layout(True, mode)["capacity"])
+    page_capacity = int(table_layout(False, mode)["capacity"])
     if len(lines) <= final_capacity:
         return [(lines, True)]
 
@@ -1421,7 +1531,7 @@ def paginate_lines(lines: list[Line]) -> list[tuple[list[Line], bool]]:
 
 
 def draw_table_page(c: canvas.Canvas, invoice: InvoiceData, page_lines: list[Line], show_summary: bool) -> float:
-    layout = table_layout(show_summary)
+    layout = table_layout(show_summary, invoice.mode)
     x = layout["x"]
     table_w = layout["table_w"]
     desc_w = layout["desc_w"]
@@ -1473,11 +1583,22 @@ def draw_table_page(c: canvas.Canvas, invoice: InvoiceData, page_lines: list[Lin
             c.drawString(x + 42, y, fit_text(c, fmt_measure_text(line.dimensions), 78, REGULAR_FONT, line_font_size))
             c.drawString(x + 130, y, fit_text(c, line_characteristics(line), 170, REGULAR_FONT, line_font_size))
         else:
-            c.drawString(x + 5, y, fit_text(c, line.material, 34, REGULAR_FONT, line_font_size))
-            c.drawString(x + 45, y, fit_text(c, fmt_measure_text(line.dimensions), 74, REGULAR_FONT, line_font_size))
-            c.drawString(x + 128, y, fit_text(c, line.quality, 48, REGULAR_FONT, line_font_size))
-            c.drawString(x + 188, y, fit_text(c, line.factory_id, 52, REGULAR_FONT, line_font_size))
-            draw_wrapped_center(c, line.packing, x + 243, y + 2, 80, REGULAR_FONT, 4.9)
+            main_desc, packing_desc = detail_description_parts(line)
+            c.setFont(REGULAR_FONT, 5.8)
+            if packing_desc:
+                c.drawString(x + 5, y + 3.2, fit_text(c, main_desc, desc_w - 12, REGULAR_FONT, 5.8))
+                c.drawString(x + 5, y - 3.4, fit_text(c, packing_desc, desc_w - 12, REGULAR_FONT, 5.8))
+            else:
+                draw_wrapped_left(
+                    c,
+                    main_desc,
+                    x + 5,
+                    y + 3,
+                    desc_w - 12,
+                    REGULAR_FONT,
+                    5.8,
+                    max_lines=2,
+                )
         draw_right_fit(c, fmt_decimal(line.quantity, 3, False), col_x[2] - 8, y, qty_w - 12, REGULAR_FONT, line_font_size)
         draw_right_fit(c, fmt_price(line.price, invoice.currency_symbol), col_x[3] - 8, y, price_w - 12, REGULAR_FONT, line_font_size)
         draw_right_fit(c, fmt_money(line.amount, invoice.currency_symbol), col_x[4] - 4, y, amount_w - 6, REGULAR_FONT, line_font_size)
@@ -1586,7 +1707,7 @@ def render_pdf(invoice: InvoiceData, output_path: Path, max_lines: int) -> None:
     c = canvas.Canvas(str(output_path), pagesize=A4)
     page_w, page_h = A4
 
-    for page_lines, is_final_page in paginate_lines(invoice.lines):
+    for page_lines, is_final_page in paginate_lines(invoice.lines, invoice.mode):
         draw_header(c, invoice)
         c.setFont(BOLD_FONT, 6.8)
         c.drawString(52, 706, f"{document_header_label(invoice)}: {invoice.invoice_id}")
