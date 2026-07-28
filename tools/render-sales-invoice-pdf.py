@@ -152,7 +152,12 @@ ITEM_VENTA = {
     "precio_eur": "fldcg1jTAyKcxeKGC",
 }
 
-MATERIAL = {"codigo": "fldpB4YiAn2w8w70I", "nombre": "fldDclRe2H0kqZw48"}
+MATERIAL = {
+    "codigo": "fldpB4YiAn2w8w70I",
+    "nombre": "fldDclRe2H0kqZw48",
+    "tipo": "fld9l2c0MW70BKlzb",
+}
+TIPO_MATERIAL = {"nombre": "fldYe0hoT3OWTfwA1"}
 BARCO = {"nombre": "fldPOt1yGRROvj6fa"}
 INCOTERM = {"nombre": "fldPX1GEsaBR4rzMd"}
 TERMINO = {"nombre": "fldVtyWKQXXoz2VHc"}
@@ -170,6 +175,7 @@ TABLES = {
     "ventas": "tbly2fHo6evAFY33X",
     "items_venta": "tblmx0d8G49Qx29LD",
     "materiales": "tbldcH54bb4nIP2Ts",
+    "tipos_material": "tblVYEUxcX8xtyUsv",
     "barcos": "tblApIqakkmlO73gM",
     "incoterms": "tblynLHJbKXFrLhTc",
     "terminos": "tbl5psJrD0ezwtSzN",
@@ -181,8 +187,20 @@ MATERIAL_LABELS = {
     "HRC": "HOT ROLLED STEEL COILS",
     "HRP": "HOT ROLLED PICKLED AND OILED STEEL COILS",
     "HDG": "HOT-DIP GALVANIZED STEEL COILS",
+    "P&O": "HOT ROLLED PICKLED AND OILED STEEL COILS",
+    "ZN-MG": "HOT-DIP ZINC ALLOYED MAGNESIUM COATED STEEL COILS",
+    "PPGI": "PREPAINTED GALVANIZED STEEL COILS",
+    "PPGL": "PREPAINTED HOT-DIP ALUMINIUM ZINC ALLOY COATED STEEL COILS",
     "ETP": "ELECTROLYTIC TINPLATE",
     "TFS": "TIN FREE STEEL",
+}
+
+MATERIAL_TYPE_SUFFIXES = {
+    "Bobina": "COILS",
+    "Fleje": "STRIPS",
+    "Hoja": "SHEETS",
+    "Chapa": "PLATES",
+    "Chapa grande": "PLATES",
 }
 
 
@@ -210,6 +228,7 @@ class Line:
     net_weight: float = 0.0
     gross_weight: float = 0.0
     weight_basis: str = ""
+    material_heading: str = ""
 
 
 @dataclass
@@ -410,6 +429,24 @@ def clean_text(value: str) -> str:
 def clean_invoice_phrase(value: str) -> str:
     text = clean_text(value)
     return text.strip(" \"'“”")
+
+
+def format_material_heading(name: str, material_type: str = "") -> str:
+    heading = clean_text(name).upper()
+    if not heading:
+        return ""
+    suffix = MATERIAL_TYPE_SUFFIXES.get(clean_text(material_type))
+    if not suffix:
+        return heading
+    singular_suffix = suffix[:-1] if suffix.endswith("S") else suffix
+    if heading.endswith(suffix) or heading.endswith(singular_suffix):
+        return heading
+    return f"{heading} {suffix}"
+
+
+def material_heading_from_code(code: str) -> str:
+    clean_code = clean_text(code).upper()
+    return MATERIAL_LABELS.get(clean_code, clean_code).upper()
 
 
 def scalar_text(value: Any, default: str = "") -> str:
@@ -767,6 +804,18 @@ def apply_invoice_mode(invoice: InvoiceData, mode: Any, weight_mode: Any = "") -
 
 
 def infer_category(lines: list[Line], fallback: str) -> str:
+    headings = list(
+        dict.fromkeys(
+            clean_text(line.material_heading).upper()
+            for line in lines
+            if clean_text(line.material_heading)
+        )
+    )
+    if len(headings) == 1:
+        return headings[0]
+    if len(headings) > 1:
+        return " / ".join(headings)
+
     codes = list(
         dict.fromkeys(
             clean_text(line.material).upper() for line in lines if clean_text(line.material)
@@ -774,15 +823,15 @@ def infer_category(lines: list[Line], fallback: str) -> str:
     )
     if len(codes) == 1:
         code = codes[0]
-        return MATERIAL_LABELS.get(code, code).upper()
+        return material_heading_from_code(code)
     if set(codes) == {"ETP", "TFS"}:
         return "TIN FREE STEEL / ELECTROLYTIC TINPLATE"
-    known_labels = [MATERIAL_LABELS[code] for code in codes if code in MATERIAL_LABELS]
+    known_labels = [material_heading_from_code(code) for code in codes if code in MATERIAL_LABELS]
     if known_labels and len(known_labels) == len(codes):
-        return " / ".join(known_labels).upper()
+        return " / ".join(known_labels)
     if fallback:
         fallback_code = clean_text(fallback).upper()
-        return MATERIAL_LABELS.get(fallback_code, fallback_code).upper()
+        return material_heading_from_code(fallback_code)
     return "STEEL PRODUCTS"
 
 
@@ -820,6 +869,7 @@ def build_invoice(
     ventas = index(load_table(records_dir, "Contratos_de_venta"))
     items_venta = index(load_table(records_dir, "Items_de_venta"))
     materiales = index(load_table(records_dir, "Materiales"))
+    tipos_material = index(load_table(records_dir, "Tipos_de_material"))
     barcos = index(load_table(records_dir, "Barcos"))
     incoterms = index(load_table(records_dir, "Incoterms"))
     terminos = index(load_table(records_dir, "Terminos_de_pago"))
@@ -850,6 +900,7 @@ def build_invoice(
         ventas=ventas,
         items_venta=items_venta,
         materiales=materiales,
+        tipos_material=tipos_material,
         barcos=barcos,
         incoterms=incoterms,
         terminos=terminos,
@@ -899,6 +950,10 @@ def build_invoice_live(
 
     items_venta = fetch_records_by_ids(base_id, TABLES["items_venta"], item_ids, token)
     materiales = fetch_records_by_ids(base_id, TABLES["materiales"], material_ids, token)
+    tipo_material_ids = collect_link_ids(list(materiales.values()), MATERIAL["tipo"])
+    tipos_material = fetch_records_by_ids(
+        base_id, TABLES["tipos_material"], tipo_material_ids, token
+    )
     barcos = fetch_records_by_ids(base_id, TABLES["barcos"], barco_ids, token)
     incoterms = fetch_records_by_ids(base_id, TABLES["incoterms"], incoterm_ids, token)
     terminos = fetch_records_by_ids(base_id, TABLES["terminos"], termino_ids, token)
@@ -910,6 +965,7 @@ def build_invoice_live(
         ventas=ventas,
         items_venta=items_venta,
         materiales=materiales,
+        tipos_material=tipos_material,
         barcos=barcos,
         incoterms=incoterms,
         terminos=terminos,
@@ -960,6 +1016,8 @@ def build_invoice_from_payload(
                 net_weight=scalar_number(item.get("netWeight")),
                 gross_weight=scalar_number(item.get("grossWeight")),
                 weight_basis=scalar_text(item.get("weightBasis")),
+                material_heading=scalar_text(item.get("materialHeading"))
+                or material_heading_from_code(item.get("material")),
             )
         )
 
@@ -1055,6 +1113,7 @@ def build_invoice_from_records(
     ventas: dict[str, dict[str, Any]],
     items_venta: dict[str, dict[str, Any]],
     materiales: dict[str, dict[str, Any]],
+    tipos_material: dict[str, dict[str, Any]],
     barcos: dict[str, dict[str, Any]],
     incoterms: dict[str, dict[str, Any]],
     terminos: dict[str, dict[str, Any]],
@@ -1076,11 +1135,19 @@ def build_invoice_from_records(
     ]
     lines: list[Line] = []
     for existencia in line_records:
+        material_record = linked_record(get_field(existencia, EXISTENCIA["material"]), materiales)
         material_code = linked_text(
             get_field(existencia, EXISTENCIA["material"]),
             materiales,
             MATERIAL["codigo"],
             "",
+        )
+        material_name = scalar_text(get_field(material_record, MATERIAL["nombre"]))
+        material_type_record = linked_record(get_field(material_record, MATERIAL["tipo"]), tipos_material)
+        material_type = scalar_text(get_field(material_type_record, TIPO_MATERIAL["nombre"]))
+        material_heading = (
+            format_material_heading(material_name, material_type)
+            or material_heading_from_code(material_code)
         )
         thickness = scalar_text(get_field(existencia, EXISTENCIA["espesor"]))
         width = scalar_text(get_field(existencia, EXISTENCIA["ancho"]))
@@ -1136,6 +1203,7 @@ def build_invoice_from_records(
                 net_weight=scalar_number(get_field(existencia, EXISTENCIA["neto"])),
                 gross_weight=scalar_number(get_field(existencia, EXISTENCIA["bruto"])),
                 weight_basis=scalar_text(get_field(existencia, EXISTENCIA["peso_cliente"])),
+                material_heading=material_heading,
             )
         )
 
