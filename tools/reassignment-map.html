@@ -4,29 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
-  <title>Mapa de reasignacion de bobinas</title>
+  <title>Arbol de reasignacion de bobinas</title>
   <style>
     :root {
       color-scheme: light;
       --ink: #202428;
-      --muted: #667078;
-      --line: #cbd2d6;
-      --surface: #ffffff;
-      --page: #f4f6f6;
+      --muted: #687178;
+      --line: #c8cfd3;
+      --page: #f3f5f5;
+      --surface: #fff;
       --brand: #7a0019;
       --brand-soft: #f7e9ed;
       --green: #176c48;
       --green-soft: #e4f3ec;
       --blue: #1d5e87;
       --blue-soft: #e7f1f7;
-      --amber: #8a5b00;
+      --amber: #805500;
       --amber-soft: #fff3d7;
-      --danger: #a52a2a;
+      --danger: #9e2b2b;
       --danger-soft: #fdeaea;
     }
 
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
       background: var(--page);
@@ -37,13 +36,7 @@
     }
 
     button { font: inherit; letter-spacing: 0; }
-
-    .shell {
-      width: min(1440px, calc(100% - 28px));
-      margin: 0 auto;
-      padding: 20px 0 40px;
-    }
-
+    .shell { width: min(1180px, calc(100% - 28px)); margin: 0 auto; padding: 20px 0 42px; }
     header {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -52,51 +45,29 @@
       border-bottom: 3px solid var(--brand);
       padding-bottom: 14px;
     }
-
-    .brand {
-      color: var(--brand);
-      font-size: 12px;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      margin: 3px 0 0;
-      font-size: clamp(23px, 3vw, 34px);
-      line-height: 1.1;
-    }
-
+    .eyebrow { color: var(--brand); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+    h1 { margin: 3px 0 0; font-size: 30px; line-height: 1.12; }
     .status {
-      display: inline-flex;
-      align-items: center;
-      min-height: 32px;
       border: 1px solid currentColor;
       border-radius: 5px;
-      padding: 6px 10px;
+      padding: 7px 10px;
       font-size: 12px;
       font-weight: 800;
     }
-
     .status.applied { color: var(--green); background: var(--green-soft); }
     .status.reverted { color: var(--blue); background: var(--blue-soft); }
     .status.blocked { color: var(--danger); background: var(--danger-soft); }
-
-    .summary-bar {
+    .summary {
       display: flex;
       flex-wrap: wrap;
       gap: 18px;
       align-items: center;
-      margin: 12px 0;
+      margin: 12px 0 18px;
       color: var(--muted);
       font-size: 12px;
     }
-
-    .summary-bar strong {
-      color: var(--ink);
-      font-size: 15px;
-    }
-
-    .summary-bar button {
+    .summary strong { color: var(--ink); font-size: 15px; }
+    .summary button {
       margin-left: auto;
       min-height: 32px;
       border: 1px solid #aeb7bc;
@@ -105,246 +76,142 @@
       padding: 6px 10px;
       cursor: pointer;
     }
-
-    .notice {
-      margin: 10px 0;
-      border-left: 4px solid var(--amber);
-      background: var(--amber-soft);
-      padding: 9px 12px;
-    }
-
-    .notice.error {
-      border-left-color: var(--danger);
-      background: var(--danger-soft);
-    }
-
-    .notice strong { display: block; margin-bottom: 4px; }
-    .notice ul { margin: 0; padding-left: 18px; }
-
-    .diagram {
-      border: 1px solid var(--line);
-      background: var(--surface);
-      padding: 16px;
-      overflow: hidden;
-    }
-
-    .delivery-root {
+    .notice { margin: 10px 0; border-left: 4px solid var(--amber); background: var(--amber-soft); padding: 9px 12px; }
+    .notice.error { border-left-color: var(--danger); background: var(--danger-soft); }
+    .tree-title { margin: 24px 0 13px; font-size: 18px; }
+    .tree {
       position: relative;
-      width: min(760px, 100%);
-      margin: 0 auto 32px;
-      border-top: 4px solid var(--brand);
-      background: var(--brand-soft);
-      padding: 12px 14px 14px;
+      display: grid;
+      gap: 16px;
+      padding-left: 24px;
     }
-
-    .delivery-root::after {
+    .tree::before {
       content: "";
       position: absolute;
-      left: 50%;
-      top: 100%;
-      height: 33px;
-      border-left: 2px solid var(--brand);
+      left: 7px;
+      top: 0;
+      bottom: 18px;
+      border-left: 2px solid #aeb7bc;
     }
-
-    .delivery-root::before {
+    .item {
+      position: relative;
+      border-top: 4px solid #737e84;
+      border-radius: 6px;
+      background: var(--surface);
+      box-shadow: 0 1px 2px rgba(20, 28, 33, .12);
+    }
+    .item.target { border-top-color: var(--brand); }
+    .item::before {
       content: "";
       position: absolute;
-      left: calc(50% - 5px);
-      top: calc(100% + 25px);
-      width: 8px;
-      height: 8px;
-      border-right: 2px solid var(--brand);
-      border-bottom: 2px solid var(--brand);
-      transform: rotate(45deg);
+      left: -17px;
+      top: 27px;
+      width: 17px;
+      border-top: 2px solid #aeb7bc;
     }
-
-    .root-heading {
+    .item-head {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px 14px;
-      align-items: baseline;
-      margin-bottom: 10px;
+      gap: 14px;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 13px 16px 11px;
+      border-bottom: 1px solid #e0e4e6;
     }
-
-    .root-heading small,
-    .stage-title,
-    .group-kicker,
-    .coil-caption {
-      color: var(--muted);
-      font-size: 10px;
+    .item-name { margin: 0; font-size: 18px; line-height: 1.2; }
+    .item-role {
+      flex: 0 0 auto;
+      border-radius: 4px;
+      background: #edf0f1;
+      color: #4f5b61;
+      padding: 4px 7px;
+      font-size: 11px;
       font-weight: 800;
       text-transform: uppercase;
     }
-
-    .root-heading strong {
-      color: var(--brand);
-      font-size: 18px;
-      overflow-wrap: anywhere;
-    }
-
-    .flow {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1.15fr) 34px minmax(0, 1fr);
-      gap: 8px;
-      align-items: stretch;
-    }
-
-    .flow-arrow {
-      display: grid;
-      place-items: center;
-      color: var(--brand);
-      font-size: 23px;
-      font-weight: 800;
-    }
-
-    .stage {
-      min-width: 0;
-      border-top: 3px solid var(--line);
-      padding-top: 10px;
-    }
-
-    .stage.target { border-top-color: var(--green); }
-    .stage.after { border-top-color: var(--blue); }
-
-    .stage-title {
-      margin-bottom: 10px;
-      color: var(--ink);
-      font-size: 11px;
-    }
-
-    .order-group {
-      position: relative;
-      margin: 0 0 12px;
-      border-left: 3px solid var(--line);
-      padding-left: 10px;
-    }
-
-    .stage.target .order-group { border-left-color: var(--green); }
-    .stage.after .order-group { border-left-color: var(--blue); }
-
-    .order-name {
-      margin: 2px 0 4px;
-      font-size: 14px;
-      font-weight: 800;
-      overflow-wrap: anywhere;
-    }
-
-    .transport-list {
-      margin-bottom: 7px;
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1.35;
-      overflow-wrap: anywhere;
-    }
-
-    .coil-section + .coil-section {
-      margin-top: 10px;
-      border-top: 1px dashed var(--line);
-      padding-top: 9px;
-    }
-
-    .coil-caption {
-      display: block;
-      margin-bottom: 6px;
-    }
-
-    .coil-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
-      gap: 6px;
-    }
-
-    .coil {
-      min-width: 0;
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: #fbfcfc;
-      padding: 7px 8px;
-    }
-
-    .coil.picked {
-      border-color: #d0a2ad;
-      background: var(--brand-soft);
-    }
-
-    .coil.final {
-      border-color: #91c7ae;
-      background: var(--green-soft);
-    }
-
-    .coil.replacement {
-      border-color: #9ec5da;
-      background: var(--blue-soft);
-    }
-
-    .coil strong {
-      display: block;
-      overflow-wrap: anywhere;
-      font-size: 12px;
-      line-height: 1.2;
-    }
-
-    .coil span {
-      display: block;
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 10px;
-      line-height: 1.25;
-    }
-
-    .empty {
-      border: 1px dashed #aeb7bc;
-      padding: 16px;
-      color: var(--muted);
-      text-align: center;
-    }
-
-    .legend {
+    .target .item-role { background: var(--brand-soft); color: var(--brand); }
+    .branch { position: relative; margin: 0 16px 0 30px; padding: 12px 0 12px 20px; border-left: 2px solid var(--line); }
+    .branch::before { content: ""; position: absolute; left: 0; top: 27px; width: 14px; border-top: 2px solid var(--line); }
+    .route {
       display: flex;
       flex-wrap: wrap;
+      gap: 7px;
+      align-items: center;
+      min-height: 29px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .route-node {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #f7f8f8;
+      padding: 5px 8px;
+      color: var(--ink);
+      font-weight: 700;
+    }
+    .route-note { border-color: #d5aab4; background: var(--brand-soft); color: var(--brand); }
+    .route-arrow { font-weight: 900; color: #899399; }
+    .moves {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
-      margin-top: 12px;
+      padding: 0 16px 14px;
+    }
+    .move-group { min-width: 0; }
+    .move-title {
+      margin: 0 0 7px;
       color: var(--muted);
       font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
     }
-
-    .legend span { display: inline-flex; gap: 5px; align-items: center; }
-    .swatch { width: 11px; height: 11px; border: 1px solid var(--line); }
-    .swatch.picked { background: var(--brand-soft); border-color: #d0a2ad; }
-    .swatch.final { background: var(--green-soft); border-color: #91c7ae; }
-    .swatch.replacement { background: var(--blue-soft); border-color: #9ec5da; }
-
-    @media (max-width: 900px) {
-      .flow {
-        grid-template-columns: 1fr;
-      }
-
-      .flow-arrow {
-        min-height: 28px;
-        transform: rotate(90deg);
-      }
-
-      .stage { border-top-width: 3px; }
-      .delivery-root { margin-bottom: 32px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; align-items: stretch; }
+    .coil {
+      display: grid;
+      grid-template-columns: auto;
+      gap: 1px;
+      min-width: 182px;
+      max-width: 260px;
+      border: 1px solid var(--line);
+      border-left: 4px solid #707b81;
+      border-radius: 5px;
+      background: #fafbfb;
+      padding: 7px 9px;
     }
+    .coil.in { border-left-color: var(--green); background: var(--green-soft); }
+    .coil.out { border-left-color: var(--blue); background: var(--blue-soft); }
+    .coil strong { overflow-wrap: anywhere; font-size: 13px; }
+    .coil-meta, .coil-direction { color: var(--muted); font-size: 11px; line-height: 1.3; }
+    .coil-direction { color: var(--ink); font-weight: 700; }
+    .rest {
+      margin: 0 16px 15px;
+      border: 1px dashed #aeb7bc;
+      border-radius: 5px;
+      background: #f4f6f6;
+      padding: 8px 11px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .empty { color: var(--muted); font-size: 12px; }
+    .fatal { margin-top: 20px; border: 1px solid #e0a7a7; background: var(--danger-soft); padding: 15px; }
 
-    @media (max-width: 600px) {
-      .shell { width: min(100% - 16px, 1440px); padding-top: 14px; }
+    @media (max-width: 720px) {
+      .shell { width: min(100% - 18px, 1180px); padding-top: 12px; }
       header { grid-template-columns: 1fr; align-items: start; }
+      h1 { font-size: 23px; }
       .status { justify-self: start; }
-      .summary-bar { gap: 8px 14px; }
-      .summary-bar button { margin-left: 0; }
-      .diagram { padding: 11px; }
-      .delivery-root { padding: 10px; }
-      .coil-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-
-    @media print {
-      body { background: white; }
-      .shell { width: 100%; padding: 0; }
-      .summary-bar button { display: none; }
-      .diagram { border: 0; padding: 0; }
-      .order-group, .coil { break-inside: avoid; }
+      .summary { gap: 10px 16px; }
+      .summary button { margin-left: 0; }
+      .tree { padding-left: 15px; }
+      .tree::before { left: 3px; }
+      .item::before { left: -12px; width: 12px; }
+      .item-head { padding: 12px; }
+      .item-name { font-size: 16px; }
+      .branch { margin: 0 12px 0 18px; padding-left: 13px; }
+      .branch::before { width: 9px; }
+      .moves { grid-template-columns: 1fr; padding: 0 12px 12px; }
+      .coil { min-width: min(100%, 210px); flex: 1 1 180px; max-width: none; }
+      .rest { margin: 0 12px 12px; }
     }
   </style>
 </head>
@@ -352,272 +219,195 @@
   <main class="shell">
     <header>
       <div>
-        <div class="brand">Steel Trade Advisors</div>
-        <h1 id="title">Mapa de reasignacion</h1>
+        <div class="eyebrow">Reasignacion de bobinas</div>
+        <h1 id="title">Cargando movimientos...</h1>
       </div>
       <div id="status" class="status">Cargando</div>
     </header>
-
-    <section id="summary" class="summary-bar" aria-label="Resumen"></section>
-    <section id="notices"></section>
-    <section id="diagram" class="diagram" aria-live="polite"></section>
+    <div id="summary" class="summary"></div>
+    <div id="notices"></div>
+    <h2 class="tree-title">Items de venta implicados</h2>
+    <section id="tree" class="tree"></section>
+    <div id="fatal"></div>
   </main>
-
   <script>
     (() => {
-      const statusLabels = {
-        applied: "Cambios aplicados",
-        reverted: "Movimientos revertidos",
-        blocked: "Plan bloqueado, sin cambios"
-      };
-
-      const decodePayload = () => {
-        const encoded = location.hash.slice(1);
-        if (!encoded) throw new Error("El enlace no contiene datos de movimientos.");
-        const padded = encoded.replace(/-/g, "+").replace(/_/g, "/") +
-          "=".repeat((4 - encoded.length % 4) % 4);
-        const binary = atob(padded);
-        const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
-        return JSON.parse(new TextDecoder().decode(bytes));
-      };
-
-      const element = (tag, className, text) => {
-        const node = document.createElement(tag);
-        if (className) node.className = className;
-        if (text !== undefined && text !== null) node.textContent = text;
-        return node;
-      };
-
-      const itemKey = item => item?.id || item?.label || "sin-pedido";
-      const itemLabel = item => item?.label || "Sin pedido de venta";
-
-      const uniqueBy = (items, keyFn) => {
+      const escapeHtml = (value) => String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+      const uniqueById = (values) => {
         const seen = new Set();
-        return (items || []).filter(item => {
-          if (!item) return false;
-          const key = keyFn(item);
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
+        return values.filter((value) => value?.id && !seen.has(value.id) && seen.add(value.id));
       };
-
-      const stockKey = stock => stock?.id || stock?.label || "";
-
-      const stockMeta = stock => {
+      const stockMeta = (stock) => {
         const parts = [];
-        if (Number.isFinite(stock?.gross)) parts.push(`${stock.gross.toFixed(3)} t`);
+        if (Number.isFinite(stock?.gross)) parts.push(`${new Intl.NumberFormat("es-ES").format(stock.gross)} kg`);
         if (stock?.location) parts.push(stock.location);
         return parts.join(" | ");
       };
+      const statusText = { applied: "Cambios aplicados", reverted: "Cambios revertidos", blocked: "Sin cambios" };
 
-      const addStockGrid = (parent, caption, stocks, variant) => {
-        const uniqueStocks = uniqueBy(stocks, stockKey);
-        if (!uniqueStocks.length) return;
-        const section = element("div", "coil-section");
-        section.append(element("span", "coil-caption", `${caption} (${uniqueStocks.length})`));
-        const grid = element("div", "coil-grid");
-        uniqueStocks.forEach(stock => {
-          const coil = element("div", `coil ${variant}`);
-          coil.append(element("strong", "", stock.label || stock.id || "Existencia"));
-          const meta = stockMeta(stock);
-          if (meta) coil.append(element("span", "", meta));
-          grid.append(coil);
-        });
-        section.append(grid);
-        parent.append(section);
-      };
+      function decodePayload() {
+        const encoded = location.hash.slice(1);
+        if (!encoded) throw new Error("El enlace no contiene datos de movimientos.");
+        const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - encoded.length % 4) % 4);
+        const binary = atob(base64);
+        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        return JSON.parse(new TextDecoder().decode(bytes));
+      }
 
-      const groupByItem = entries => {
-        const groups = new Map();
-        entries.forEach(entry => {
-          const key = itemKey(entry.item);
-          if (!groups.has(key)) {
-            groups.set(key, {
-              item: entry.item,
-              transports: [],
-              picked: [],
-              final: [],
-              replacements: [],
-              released: []
-            });
-          }
-          const group = groups.get(key);
-          group.transports.push(...(entry.transports || []));
-          group.picked.push(...(entry.picked || []));
-          group.final.push(...(entry.final || []));
-          group.replacements.push(...(entry.replacements || []));
-          group.released.push(...(entry.released || []));
-        });
-        return [...groups.values()];
-      };
-
-      const movementGroups = movements => {
-        const origins = [];
+      function itemContexts(payload) {
+        if (Array.isArray(payload.saleItems) && payload.saleItems.length) return payload.saleItems;
         const targets = [];
-        const compensations = [];
-
-        movements.forEach(movement => {
-          const originItems = movement.before?.saleItems?.length
-            ? movement.before.saleItems
-            : [null];
-          originItems.forEach(item => origins.push({
-            item,
-            transports: movement.before?.transports || [],
-            picked: [movement.actual]
-          }));
-
-          targets.push({
-            item: movement.target?.saleItem,
-            transports: movement.target?.transport ? [movement.target.transport] : [],
-            final: [movement.actual],
-            released: movement.displaced ? [movement.displaced] : []
-          });
-
-          (movement.compensations || []).forEach(compensation => {
-            compensations.push({
-              item: compensation.saleItem,
-              transports: compensation.transports || [],
-              replacements: [compensation.replacement || movement.displaced]
-            });
-          });
-        });
-
-        return {
-          origins: groupByItem(origins),
-          targets: groupByItem(targets),
-          compensations: groupByItem(compensations)
-        };
-      };
-
-      const addOrderGroup = (parent, group, mode) => {
-        const section = element("section", "order-group");
-        section.append(element("div", "group-kicker", "Pedido / item de venta"));
-        section.append(element("div", "order-name", itemLabel(group.item)));
-
-        const transports = uniqueBy(group.transports, itemKey).map(itemLabel);
-        if (transports.length) {
-          section.append(element("div", "transport-list", transports.join(" | ")));
+        const donors = [];
+        for (const movement of payload.movements || []) {
+          if (movement.target?.saleItem) targets.push({ ...movement.target.saleItem, role: "target", otherStockCount: null });
+          for (const item of movement.before?.saleItems || []) donors.push({ ...item, role: "donor", otherStockCount: null });
+          for (const compensation of movement.compensations || []) {
+            if (compensation.saleItem) donors.push({ ...compensation.saleItem, role: "donor", otherStockCount: null });
+          }
         }
+        const targetItems = uniqueById(targets);
+        const targetIds = new Set(targetItems.map((item) => item.id));
+        return [...targetItems, ...uniqueById(donors).filter((item) => !targetIds.has(item.id))];
+      }
 
-        if (mode === "origin") {
-          addStockGrid(section, "Las recoge el albaran", group.picked, "picked");
-        } else if (mode === "target") {
-          addStockGrid(section, "Entran como definitivas", group.final, "final");
-          addStockGrid(section, "Libera para compensar", group.released, "replacement");
-        } else {
-          addStockGrid(section, "Recibe como sustitutas", group.replacements, "replacement");
+      function transportRoutes(item, payload) {
+        const transports = [];
+        for (const movement of payload.movements || []) {
+          if (movement.target?.saleItem?.id === item.id && movement.target.transport) {
+            transports.push(movement.target.transport);
+          }
+          if (item.role !== "target") {
+            if ((movement.before?.saleItems || []).some((saleItem) => saleItem.id === item.id)) {
+              transports.push(...(movement.before?.transports || []));
+            }
+            for (const compensation of movement.compensations || []) {
+              if (compensation.saleItem?.id === item.id) transports.push(...(compensation.transports || []));
+            }
+          }
         }
-        parent.append(section);
-      };
+        return uniqueById(transports);
+      }
 
-      const addStage = (className, title, groups, mode) => {
-        const stage = element("section", `stage ${className}`.trim());
-        stage.append(element("div", "stage-title", title));
-        if (!groups.length) {
-          stage.append(element("div", "empty", "No hay asignaciones en este nivel."));
-        } else {
-          groups.forEach(group => addOrderGroup(stage, group, mode));
+      function movementsForItem(item, payload) {
+        const incoming = [];
+        const outgoing = [];
+        for (const movement of payload.movements || []) {
+          const target = movement.target?.saleItem;
+          if (target?.id === item.id) {
+            if (movement.actual) incoming.push({ stock: movement.actual, direction: `Desde ${originLabel(movement)}` });
+            if (movement.displaced) outgoing.push({ stock: movement.displaced, direction: `Hacia ${compensationLabel(movement, movement.displaced)}` });
+          }
+          const isOriginal = (movement.before?.saleItems || []).some((saleItem) => saleItem.id === item.id);
+          if (isOriginal && movement.actual) {
+            outgoing.push({ stock: movement.actual, direction: `Hacia ${target?.label || "item de destino"}` });
+          }
+          for (const compensation of movement.compensations || []) {
+            if (compensation.saleItem?.id === item.id && compensation.replacement) {
+              incoming.push({ stock: compensation.replacement, direction: `Desde ${target?.label || "item de destino"}` });
+            }
+          }
         }
-        return stage;
-      };
+        return { incoming: dedupeMoves(incoming), outgoing: dedupeMoves(outgoing) };
+      }
 
-      const renderNotices = payload => {
-        const root = document.querySelector("#notices");
-        [
-          ["Errores", payload.errors, "notice error"],
-          ["Avisos", payload.warnings, "notice"]
-        ].forEach(([title, messages, className]) => {
-          if (!messages?.length) return;
-          const box = element("div", className);
-          box.append(element("strong", "", title));
-          const list = element("ul");
-          messages.forEach(message => list.append(element("li", "", message)));
-          box.append(list);
-          root.append(box);
-        });
-      };
+      function originLabel(movement) {
+        return (movement.before?.saleItems || []).map((item) => item.label).join(", ") || "sin item anterior";
+      }
 
-      const render = payload => {
-        const movements = payload.movements || [];
-        const actualStocks = uniqueBy(movements.map(item => item.actual), stockKey);
-        const grossTotal = actualStocks.reduce(
-          (total, stock) => total + (Number.isFinite(stock?.gross) ? stock.gross : 0),
-          0
-        );
+      function compensationLabel(movement, stock) {
+        const match = (movement.compensations || []).find((entry) => entry.replacement?.id === stock.id);
+        return match?.saleItem?.label || originLabel(movement);
+      }
 
-        document.title = `${payload.deliveryNote || "Albaran"} | Mapa de reasignacion`;
-        document.querySelector("#title").textContent = payload.deliveryNote || "Mapa de reasignacion";
-        const status = document.querySelector("#status");
-        status.textContent = statusLabels[payload.status] || payload.status || "Resultado";
-        status.className = `status ${payload.status || ""}`;
+      function dedupeMoves(values) {
+        const seen = new Set();
+        return values.filter((entry) => entry.stock?.id && !seen.has(entry.stock.id) && seen.add(entry.stock.id));
+      }
 
-        const summary = document.querySelector("#summary");
-        const count = element("span");
-        count.append(element("strong", "", String(actualStocks.length)));
-        count.append(document.createTextNode(" Bobinas"));
-        summary.append(count);
-        if (grossTotal) {
-          const weight = element("span");
-          weight.append(element("strong", "", `${grossTotal.toFixed(3)} t`));
-          weight.append(document.createTextNode(" Peso bruto"));
-          summary.append(weight);
+      function coilHtml(entry, type) {
+        const meta = stockMeta(entry.stock);
+        return `<div class="coil ${type}">
+          <strong>${escapeHtml(entry.stock.label || entry.stock.id)}</strong>
+          ${meta ? `<span class="coil-meta">${escapeHtml(meta)}</span>` : ""}
+          <span class="coil-direction">${type === "in" ? "-> " : "<- "}${escapeHtml(entry.direction)}</span>
+        </div>`;
+      }
+
+      function moveGroup(title, values, type) {
+        return `<section class="move-group">
+          <h4 class="move-title">${escapeHtml(title)} (${values.length})</h4>
+          <div class="chips">${values.length ? values.map((value) => coilHtml(value, type)).join("") : '<span class="empty">Ninguna</span>'}</div>
+        </section>`;
+      }
+
+      function itemHtml(item, payload) {
+        const routes = transportRoutes(item, payload);
+        const moves = movementsForItem(item, payload);
+        const routeHtml = routes.length
+          ? routes.map((transport) => `<span class="route-node">${escapeHtml(transport.label)}</span>${item.role === "target" ? `<span class="route-arrow">-></span><span class="route-node route-note">Albaran ${escapeHtml(payload.deliveryNote)}</span>` : ""}`).join("")
+          : '<span class="empty">Sin transporte relacionado en los datos del movimiento</span>';
+        const rest = Number.isFinite(item.otherStockCount)
+          ? `Resto de existencias (${item.otherStockCount})`
+          : "Resto de existencias (dato no disponible en este enlace antiguo)";
+        return `<article class="item ${item.role === "target" ? "target" : "donor"}">
+          <div class="item-head">
+            <h3 class="item-name">${escapeHtml(item.label)}</h3>
+            <span class="item-role">${item.role === "target" ? "Contiene el albaran" : "Item compensado"}</span>
+          </div>
+          <div class="branch"><div class="route">${routeHtml}</div></div>
+          <div class="moves">
+            ${moveGroup("Entran", moves.incoming, "in")}
+            ${moveGroup("Salen", moves.outgoing, "out")}
+          </div>
+          <div class="rest">${escapeHtml(rest)}</div>
+        </article>`;
+      }
+
+      function renderNotices(payload) {
+        const container = document.getElementById("notices");
+        for (const message of payload.errors || []) {
+          container.insertAdjacentHTML("beforeend", `<div class="notice error"><strong>Error:</strong> ${escapeHtml(message)}</div>`);
         }
-        const version = element("span");
-        version.append(element("strong", "", "Version"));
-        version.append(document.createTextNode(` ${payload.scriptVersion || "-"}`));
-        summary.append(version);
-        const print = element("button", "", "Imprimir");
-        print.type = "button";
-        print.addEventListener("click", () => window.print());
-        summary.append(print);
+        for (const message of payload.warnings || []) {
+          container.insertAdjacentHTML("beforeend", `<div class="notice"><strong>Aviso:</strong> ${escapeHtml(message)}</div>`);
+        }
+      }
 
+      function render(payload) {
+        const status = payload.status || "blocked";
+        document.getElementById("title").textContent = payload.deliveryNote || "Albaran";
+        const statusElement = document.getElementById("status");
+        statusElement.className = `status ${status}`;
+        statusElement.textContent = statusText[status] || status;
+        const items = itemContexts(payload);
+        const stockIds = new Set((payload.movements || []).flatMap((movement) => [
+          movement.actual?.id,
+          movement.displaced?.id,
+          ...(movement.compensations || []).map((entry) => entry.replacement?.id),
+        ].filter(Boolean)));
+        document.getElementById("summary").innerHTML = `
+          <span><strong>${items.length}</strong> items de venta</span>
+          <span><strong>${stockIds.size}</strong> bobinas implicadas</span>
+          <span>Version ${escapeHtml(payload.scriptVersion || "anterior")}</span>
+          <button type="button" onclick="window.print()">Imprimir</button>`;
         renderNotices(payload);
-        const diagram = document.querySelector("#diagram");
-        if (!movements.length) {
-          diagram.append(element("div", "empty", "No hay movimientos que representar."));
-          return;
-        }
-
-        const delivery = element("section", "delivery-root");
-        const heading = element("div", "root-heading");
-        heading.append(element("small", "", "Albaran real / camion"));
-        heading.append(element("strong", "", payload.deliveryNote || "Albaran"));
-        delivery.append(heading);
-        addStockGrid(delivery, "Bobinas que realmente ha cargado", actualStocks, "picked");
-        diagram.append(delivery);
-
-        const groups = movementGroups(movements);
-        const flow = element("div", "flow");
-        flow.append(addStage("origin", "1. Antes | pedidos de origen", groups.origins, "origin"));
-        flow.append(element("div", "flow-arrow", "→"));
-        flow.append(addStage("target", "2. El albaran reasigna", groups.targets, "target"));
-        flow.append(element("div", "flow-arrow", "→"));
-        flow.append(addStage("after", "3. Despues | pedidos compensados", groups.compensations, "after"));
-        diagram.append(flow);
-
-        const legend = element("div", "legend");
-        [
-          ["picked", "Bobina cargada por el albaran"],
-          ["final", "Asignacion definitiva"],
-          ["replacement", "Bobina liberada / sustituta"]
-        ].forEach(([variant, label]) => {
-          const item = element("span");
-          item.append(element("i", `swatch ${variant}`));
-          item.append(document.createTextNode(label));
-          legend.append(item);
-        });
-        diagram.append(legend);
-      };
+        document.getElementById("tree").innerHTML = items.length
+          ? items.map((item) => itemHtml(item, payload)).join("")
+          : '<div class="fatal">No hay items de venta que mostrar.</div>';
+      }
 
       try {
         render(decodePayload());
       } catch (error) {
-        document.querySelector("#status").textContent = "Enlace no valido";
-        document.querySelector("#status").className = "status blocked";
-        document.querySelector("#diagram").append(
-          element("div", "empty", error.message || "No se pudo abrir el mapa.")
-        );
+        document.getElementById("title").textContent = "No se pudo abrir el arbol";
+        document.getElementById("status").textContent = "Error";
+        document.getElementById("status").className = "status blocked";
+        document.getElementById("fatal").innerHTML = `<div class="fatal">${escapeHtml(error.message)}</div>`;
       }
     })();
   </script>
