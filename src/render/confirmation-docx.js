@@ -336,12 +336,12 @@ function getTableWidths(
     return [650, 2350, 950, ...originWidths, 1100, 1100, 1300, 1200];
   }
 
-  const specWidths = hasMultipleOrigins ? [2350, 950] : [2350, 950, 1200];
+  const specWidths = hasMultipleOrigins ? [2350, 750] : [2350, 950, 1000];
   return [
     650,
     ...specWidths,
     ...originWidths,
-    1100,
+    1300,
     1100,
     1300,
     1200

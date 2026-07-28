@@ -52,6 +52,30 @@ test("shows coil weight range only in grouped format", async () => {
   assert.doesNotMatch(sheetXml, /10,000 - 15,000 MT/);
 });
 
+test("gives the grouped weight range column enough width for five digit ranges", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      items: [
+        {
+          ...fakeConfirmation().items[0],
+          minNet: 10,
+          maxNet: 15
+        }
+      ]
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+  const table = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)]
+    .map((match) => match[0])
+    .find((candidate) => extractParagraphText(candidate).includes("RANGO (MT)"));
+  const widths = extractTableGridWidths(table);
+
+  assert.deepEqual(widths, [650, 2350, 950, 1000, 1300, 1100, 1300, 1200]);
+});
+
 test("formats quantities and money with thousands separators", async () => {
   const buffer = await renderConfirmationDocx(
     {
@@ -662,6 +686,11 @@ function extractDocumentText(documentXml) {
     .map((match) => extractParagraphText(match[0]))
     .filter(Boolean)
     .join("\n");
+}
+
+function extractTableGridWidths(tableXml) {
+  return [...String(tableXml || "").matchAll(/<w:gridCol w:w="(\d+)"\/>/g)]
+    .map((match) => Number(match[1]));
 }
 
 function assertOnlyLabelBold(documentXml, label, valueStart) {
