@@ -182,19 +182,6 @@ TABLES = {
     "clientes": "tbliyYuo9mWCnHGUG",
 }
 
-MATERIAL_LABELS = {
-    "CRC": "COLD ROLLED STEEL COILS",
-    "HRC": "HOT ROLLED STEEL COILS",
-    "HRP": "HOT ROLLED PICKLED AND OILED STEEL COILS",
-    "HDG": "HOT-DIP GALVANIZED STEEL COILS",
-    "P&O": "HOT ROLLED PICKLED AND OILED STEEL COILS",
-    "ZN-MG": "HOT-DIP ZINC ALLOYED MAGNESIUM COATED STEEL COILS",
-    "PPGI": "PREPAINTED GALVANIZED STEEL COILS",
-    "PPGL": "PREPAINTED HOT-DIP ALUMINIUM ZINC ALLOY COATED STEEL COILS",
-    "ETP": "ELECTROLYTIC TINPLATE",
-    "TFS": "TIN FREE STEEL",
-}
-
 MATERIAL_TYPE_SUFFIXES = {
     "Bobina": "COILS",
     "Fleje": "STRIPS",
@@ -445,8 +432,7 @@ def format_material_heading(name: str, material_type: str = "") -> str:
 
 
 def material_heading_from_code(code: str) -> str:
-    clean_code = clean_text(code).upper()
-    return MATERIAL_LABELS.get(clean_code, clean_code).upper()
+    return clean_text(code).upper()
 
 
 def scalar_text(value: Any, default: str = "") -> str:
@@ -824,11 +810,6 @@ def infer_category(lines: list[Line], fallback: str) -> str:
     if len(codes) == 1:
         code = codes[0]
         return material_heading_from_code(code)
-    if set(codes) == {"ETP", "TFS"}:
-        return "TIN FREE STEEL / ELECTROLYTIC TINPLATE"
-    known_labels = [material_heading_from_code(code) for code in codes if code in MATERIAL_LABELS]
-    if known_labels and len(known_labels) == len(codes):
-        return " / ".join(known_labels)
     if fallback:
         fallback_code = clean_text(fallback).upper()
         return material_heading_from_code(fallback_code)
