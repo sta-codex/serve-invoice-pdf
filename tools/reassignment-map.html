@@ -10,15 +10,15 @@
       color-scheme: light;
       --ink: #202428;
       --muted: #667078;
-      --line: #cfd5d8;
+      --line: #cbd2d6;
       --surface: #ffffff;
-      --page: #f3f5f5;
+      --page: #f4f6f6;
       --brand: #7a0019;
       --brand-soft: #f7e9ed;
       --green: #176c48;
-      --green-soft: #e5f4ed;
+      --green-soft: #e4f3ec;
       --blue: #1d5e87;
-      --blue-soft: #e8f2f8;
+      --blue-soft: #e7f1f7;
       --amber: #8a5b00;
       --amber-soft: #fff3d7;
       --danger: #a52a2a;
@@ -32,48 +32,48 @@
       background: var(--page);
       color: var(--ink);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 15px;
+      font-size: 14px;
       letter-spacing: 0;
     }
 
-    button, input { font: inherit; letter-spacing: 0; }
+    button { font: inherit; letter-spacing: 0; }
 
     .shell {
-      width: min(1180px, calc(100% - 32px));
+      width: min(1440px, calc(100% - 28px));
       margin: 0 auto;
-      padding: 28px 0 48px;
+      padding: 20px 0 40px;
     }
 
     header {
       display: grid;
       grid-template-columns: 1fr auto;
-      gap: 18px;
+      gap: 16px;
       align-items: end;
       border-bottom: 3px solid var(--brand);
-      padding-bottom: 18px;
+      padding-bottom: 14px;
     }
 
     .brand {
       color: var(--brand);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 800;
       text-transform: uppercase;
     }
 
     h1 {
-      margin: 5px 0 0;
-      font-size: clamp(25px, 4vw, 38px);
+      margin: 3px 0 0;
+      font-size: clamp(23px, 3vw, 34px);
       line-height: 1.1;
     }
 
     .status {
       display: inline-flex;
       align-items: center;
-      min-height: 34px;
+      min-height: 32px;
       border: 1px solid currentColor;
-      border-radius: 6px;
-      padding: 7px 11px;
-      font-size: 13px;
+      border-radius: 5px;
+      padding: 6px 10px;
+      font-size: 12px;
       font-weight: 800;
     }
 
@@ -81,70 +81,36 @@
     .status.reverted { color: var(--blue); background: var(--blue-soft); }
     .status.blocked { color: var(--danger); background: var(--danger-soft); }
 
-    .summary {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1px;
-      margin: 20px 0;
-      border: 1px solid var(--line);
-      background: var(--line);
-    }
-
-    .metric {
-      min-width: 0;
-      background: var(--surface);
-      padding: 14px 16px;
-    }
-
-    .metric strong {
-      display: block;
-      overflow-wrap: anywhere;
-      font-size: 20px;
-    }
-
-    .metric span {
+    .summary-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: center;
+      margin: 12px 0;
       color: var(--muted);
       font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
     }
 
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-    }
-
-    .toolbar input {
-      width: min(420px, 100%);
-      min-height: 38px;
-      border: 1px solid #aeb7bc;
-      border-radius: 5px;
-      background: var(--surface);
-      padding: 8px 11px;
-    }
-
-    .toolbar-actions { display: flex; gap: 8px; }
-
-    button {
-      min-height: 38px;
-      border: 1px solid #aeb7bc;
-      border-radius: 5px;
-      background: var(--surface);
+    .summary-bar strong {
       color: var(--ink);
-      padding: 8px 11px;
+      font-size: 15px;
+    }
+
+    .summary-bar button {
+      margin-left: auto;
+      min-height: 32px;
+      border: 1px solid #aeb7bc;
+      border-radius: 5px;
+      background: var(--surface);
+      padding: 6px 10px;
       cursor: pointer;
     }
 
-    button:hover { border-color: var(--brand); color: var(--brand); }
-
     .notice {
-      margin: 14px 0;
+      margin: 10px 0;
       border-left: 4px solid var(--amber);
       background: var(--amber-soft);
-      padding: 12px 14px;
+      padding: 9px 12px;
     }
 
     .notice.error {
@@ -152,186 +118,233 @@
       background: var(--danger-soft);
     }
 
-    .notice strong { display: block; margin-bottom: 5px; }
-    .notice ul { margin: 0; padding-left: 20px; }
+    .notice strong { display: block; margin-bottom: 4px; }
+    .notice ul { margin: 0; padding-left: 18px; }
 
-    .movement {
-      margin-bottom: 12px;
+    .diagram {
       border: 1px solid var(--line);
-      border-radius: 7px;
       background: var(--surface);
+      padding: 16px;
       overflow: hidden;
     }
 
-    .movement[open] { border-color: #aeb7bc; }
-
-    .movement summary {
-      display: grid;
-      grid-template-columns: 38px minmax(0, 1fr) auto;
-      gap: 11px;
-      align-items: center;
-      min-height: 64px;
-      padding: 10px 14px;
-      cursor: pointer;
-      list-style: none;
+    .delivery-root {
+      position: relative;
+      width: min(760px, 100%);
+      margin: 0 auto 32px;
+      border-top: 4px solid var(--brand);
+      background: var(--brand-soft);
+      padding: 12px 14px 14px;
     }
 
-    .movement summary::-webkit-details-marker { display: none; }
-
-    .index {
-      display: grid;
-      width: 32px;
-      height: 32px;
-      place-items: center;
-      border-radius: 50%;
-      background: var(--brand);
-      color: white;
-      font-weight: 800;
+    .delivery-root::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      height: 33px;
+      border-left: 2px solid var(--brand);
     }
 
-    .stock-title {
-      min-width: 0;
-      font-size: 16px;
-      font-weight: 800;
-      overflow-wrap: anywhere;
+    .delivery-root::before {
+      content: "";
+      position: absolute;
+      left: calc(50% - 5px);
+      top: calc(100% + 25px);
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid var(--brand);
+      border-bottom: 2px solid var(--brand);
+      transform: rotate(45deg);
     }
 
-    .stock-meta {
+    .root-heading {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      align-items: baseline;
+      margin-bottom: 10px;
+    }
+
+    .root-heading small,
+    .stage-title,
+    .group-kicker,
+    .coil-caption {
       color: var(--muted);
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .movement-kind {
-      color: var(--green);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 800;
       text-transform: uppercase;
     }
 
-    .tree {
-      border-top: 1px solid var(--line);
-      padding: 18px;
+    .root-heading strong {
+      color: var(--brand);
+      font-size: 18px;
+      overflow-wrap: anywhere;
     }
 
-    .route {
-      position: relative;
+    .flow {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1.15fr) 34px minmax(0, 1fr);
       gap: 8px;
       align-items: stretch;
     }
 
-    .arrow {
+    .flow-arrow {
       display: grid;
       place-items: center;
       color: var(--brand);
-      font-size: 25px;
+      font-size: 23px;
       font-weight: 800;
     }
 
-    .branch {
+    .stage {
       min-width: 0;
-      border-left: 4px solid var(--line);
-      padding: 2px 0 2px 14px;
+      border-top: 3px solid var(--line);
+      padding-top: 10px;
     }
 
-    .branch.target { border-left-color: var(--green); }
-    .branch.compensation { border-left-color: var(--blue); }
+    .stage.target { border-top-color: var(--green); }
+    .stage.after { border-top-color: var(--blue); }
 
-    .branch-title {
-      margin-bottom: 9px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 800;
-      text-transform: uppercase;
+    .stage-title {
+      margin-bottom: 10px;
+      color: var(--ink);
+      font-size: 11px;
     }
 
-    .node {
+    .order-group {
       position: relative;
-      margin: 7px 0;
-      border: 1px solid var(--line);
-      border-radius: 5px;
-      background: #fbfcfc;
-      padding: 9px 11px;
+      margin: 0 0 12px;
+      border-left: 3px solid var(--line);
+      padding-left: 10px;
+    }
+
+    .stage.target .order-group { border-left-color: var(--green); }
+    .stage.after .order-group { border-left-color: var(--blue); }
+
+    .order-name {
+      margin: 2px 0 4px;
+      font-size: 14px;
+      font-weight: 800;
       overflow-wrap: anywhere;
     }
 
-    .node::before {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: -18px;
-      width: 14px;
-      border-top: 1px solid var(--line);
-    }
-
-    .node small {
-      display: block;
-      margin-bottom: 2px;
+    .transport-list {
+      margin-bottom: 7px;
       color: var(--muted);
       font-size: 11px;
-      font-weight: 800;
-      text-transform: uppercase;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
     }
 
-    .node.target-node {
-      border-color: #9acbb6;
+    .coil-section + .coil-section {
+      margin-top: 10px;
+      border-top: 1px dashed var(--line);
+      padding-top: 9px;
+    }
+
+    .coil-caption {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .coil-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+      gap: 6px;
+    }
+
+    .coil {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #fbfcfc;
+      padding: 7px 8px;
+    }
+
+    .coil.picked {
+      border-color: #d0a2ad;
+      background: var(--brand-soft);
+    }
+
+    .coil.final {
+      border-color: #91c7ae;
       background: var(--green-soft);
     }
 
-    .node.replacement-node {
-      border-color: #a8cada;
+    .coil.replacement {
+      border-color: #9ec5da;
       background: var(--blue-soft);
     }
 
-    .compensation-wrap {
-      margin-top: 18px;
-      border-top: 1px dashed #aeb7bc;
-      padding-top: 18px;
+    .coil strong {
+      display: block;
+      overflow-wrap: anywhere;
+      font-size: 12px;
+      line-height: 1.2;
     }
 
-    .compensation-heading {
-      margin: 0 0 12px;
-      font-size: 15px;
-    }
-
-    .compensation-route {
-      display: grid;
-      grid-template-columns: minmax(180px, .8fr) 34px minmax(0, 1.2fr);
-      gap: 8px;
-      align-items: center;
-      margin-top: 10px;
+    .coil span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.25;
     }
 
     .empty {
       border: 1px dashed #aeb7bc;
-      background: var(--surface);
-      padding: 30px;
+      padding: 16px;
+      color: var(--muted);
       text-align: center;
     }
 
-    .hidden { display: none; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 11px;
+    }
 
-    @media (max-width: 720px) {
-      .shell { width: min(100% - 20px, 1180px); padding-top: 18px; }
+    .legend span { display: inline-flex; gap: 5px; align-items: center; }
+    .swatch { width: 11px; height: 11px; border: 1px solid var(--line); }
+    .swatch.picked { background: var(--brand-soft); border-color: #d0a2ad; }
+    .swatch.final { background: var(--green-soft); border-color: #91c7ae; }
+    .swatch.replacement { background: var(--blue-soft); border-color: #9ec5da; }
+
+    @media (max-width: 900px) {
+      .flow {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-arrow {
+        min-height: 28px;
+        transform: rotate(90deg);
+      }
+
+      .stage { border-top-width: 3px; }
+      .delivery-root { margin-bottom: 32px; }
+    }
+
+    @media (max-width: 600px) {
+      .shell { width: min(100% - 16px, 1440px); padding-top: 14px; }
       header { grid-template-columns: 1fr; align-items: start; }
       .status { justify-self: start; }
-      .summary { grid-template-columns: 1fr; }
-      .toolbar { align-items: stretch; flex-direction: column; }
-      .toolbar input { width: 100%; }
-      .toolbar-actions { display: grid; grid-template-columns: 1fr 1fr; }
-      .movement summary { grid-template-columns: 38px minmax(0, 1fr); }
-      .movement-kind { grid-column: 2; }
-      .route, .compensation-route { grid-template-columns: 1fr; }
-      .arrow { min-height: 34px; transform: rotate(90deg); }
+      .summary-bar { gap: 8px 14px; }
+      .summary-bar button { margin-left: 0; }
+      .diagram { padding: 11px; }
+      .delivery-root { padding: 10px; }
+      .coil-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media print {
       body { background: white; }
       .shell { width: 100%; padding: 0; }
-      .toolbar { display: none; }
-      .movement { break-inside: avoid; }
+      .summary-bar button { display: none; }
+      .diagram { border: 0; padding: 0; }
+      .order-group, .coil { break-inside: avoid; }
     }
   </style>
 </head>
@@ -345,18 +358,9 @@
       <div id="status" class="status">Cargando</div>
     </header>
 
-    <section id="summary" class="summary" aria-label="Resumen"></section>
+    <section id="summary" class="summary-bar" aria-label="Resumen"></section>
     <section id="notices"></section>
-
-    <div class="toolbar">
-      <input id="filter" type="search" placeholder="Buscar bobina, item o transporte" aria-label="Buscar movimientos">
-      <div class="toolbar-actions">
-        <button id="expand" type="button">Expandir todo</button>
-        <button id="print" type="button">Imprimir</button>
-      </div>
-    </div>
-
-    <section id="movements" aria-live="polite"></section>
+    <section id="diagram" class="diagram" aria-live="polite"></section>
   </main>
 
   <script>
@@ -384,34 +388,147 @@
         return node;
       };
 
+      const itemKey = item => item?.id || item?.label || "sin-pedido";
+      const itemLabel = item => item?.label || "Sin pedido de venta";
+
+      const uniqueBy = (items, keyFn) => {
+        const seen = new Set();
+        return (items || []).filter(item => {
+          if (!item) return false;
+          const key = keyFn(item);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+
+      const stockKey = stock => stock?.id || stock?.label || "";
+
       const stockMeta = stock => {
-        if (!stock) return "";
         const parts = [];
-        if (Number.isFinite(stock.gross)) parts.push(`${stock.gross.toFixed(3)} t bruto`);
-        if (stock.location) parts.push(stock.location);
+        if (Number.isFinite(stock?.gross)) parts.push(`${stock.gross.toFixed(3)} t`);
+        if (stock?.location) parts.push(stock.location);
         return parts.join(" | ");
       };
 
-      const addNode = (parent, type, value, className = "") => {
-        if (!value) return;
-        const node = element("div", `node ${className}`.trim());
-        node.append(element("small", "", type));
-        node.append(document.createTextNode(value.label || value));
-        parent.append(node);
+      const addStockGrid = (parent, caption, stocks, variant) => {
+        const uniqueStocks = uniqueBy(stocks, stockKey);
+        if (!uniqueStocks.length) return;
+        const section = element("div", "coil-section");
+        section.append(element("span", "coil-caption", `${caption} (${uniqueStocks.length})`));
+        const grid = element("div", "coil-grid");
+        uniqueStocks.forEach(stock => {
+          const coil = element("div", `coil ${variant}`);
+          coil.append(element("strong", "", stock.label || stock.id || "Existencia"));
+          const meta = stockMeta(stock);
+          if (meta) coil.append(element("span", "", meta));
+          grid.append(coil);
+        });
+        section.append(grid);
+        parent.append(section);
       };
 
-      const addLabels = (parent, type, values) => {
-        (values || []).forEach(value => addNode(parent, type, value));
+      const groupByItem = entries => {
+        const groups = new Map();
+        entries.forEach(entry => {
+          const key = itemKey(entry.item);
+          if (!groups.has(key)) {
+            groups.set(key, {
+              item: entry.item,
+              transports: [],
+              picked: [],
+              final: [],
+              replacements: [],
+              released: []
+            });
+          }
+          const group = groups.get(key);
+          group.transports.push(...(entry.transports || []));
+          group.picked.push(...(entry.picked || []));
+          group.final.push(...(entry.final || []));
+          group.replacements.push(...(entry.replacements || []));
+          group.released.push(...(entry.released || []));
+        });
+        return [...groups.values()];
+      };
+
+      const movementGroups = movements => {
+        const origins = [];
+        const targets = [];
+        const compensations = [];
+
+        movements.forEach(movement => {
+          const originItems = movement.before?.saleItems?.length
+            ? movement.before.saleItems
+            : [null];
+          originItems.forEach(item => origins.push({
+            item,
+            transports: movement.before?.transports || [],
+            picked: [movement.actual]
+          }));
+
+          targets.push({
+            item: movement.target?.saleItem,
+            transports: movement.target?.transport ? [movement.target.transport] : [],
+            final: [movement.actual],
+            released: movement.displaced ? [movement.displaced] : []
+          });
+
+          (movement.compensations || []).forEach(compensation => {
+            compensations.push({
+              item: compensation.saleItem,
+              transports: compensation.transports || [],
+              replacements: [compensation.replacement || movement.displaced]
+            });
+          });
+        });
+
+        return {
+          origins: groupByItem(origins),
+          targets: groupByItem(targets),
+          compensations: groupByItem(compensations)
+        };
+      };
+
+      const addOrderGroup = (parent, group, mode) => {
+        const section = element("section", "order-group");
+        section.append(element("div", "group-kicker", "Pedido / item de venta"));
+        section.append(element("div", "order-name", itemLabel(group.item)));
+
+        const transports = uniqueBy(group.transports, itemKey).map(itemLabel);
+        if (transports.length) {
+          section.append(element("div", "transport-list", transports.join(" | ")));
+        }
+
+        if (mode === "origin") {
+          addStockGrid(section, "Las recoge el albaran", group.picked, "picked");
+        } else if (mode === "target") {
+          addStockGrid(section, "Entran como definitivas", group.final, "final");
+          addStockGrid(section, "Libera para compensar", group.released, "replacement");
+        } else {
+          addStockGrid(section, "Recibe como sustitutas", group.replacements, "replacement");
+        }
+        parent.append(section);
+      };
+
+      const addStage = (className, title, groups, mode) => {
+        const stage = element("section", `stage ${className}`.trim());
+        stage.append(element("div", "stage-title", title));
+        if (!groups.length) {
+          stage.append(element("div", "empty", "No hay asignaciones en este nivel."));
+        } else {
+          groups.forEach(group => addOrderGroup(stage, group, mode));
+        }
+        return stage;
       };
 
       const renderNotices = payload => {
         const root = document.querySelector("#notices");
-        const groups = [
+        [
           ["Errores", payload.errors, "notice error"],
           ["Avisos", payload.warnings, "notice"]
-        ];
-        groups.forEach(([title, messages, className]) => {
-          if (!messages || !messages.length) return;
+        ].forEach(([title, messages, className]) => {
+          if (!messages?.length) return;
           const box = element("div", className);
           box.append(element("strong", "", title));
           const list = element("ul");
@@ -421,131 +538,76 @@
         });
       };
 
-      const renderCompensation = (movement, tree) => {
-        if (!movement.displaced && !(movement.compensations || []).length) return;
-        const wrap = element("section", "compensation-wrap");
-        wrap.append(element("h2", "compensation-heading", "Compensacion del pedido de origen"));
-
-        const compensations = movement.compensations && movement.compensations.length
-          ? movement.compensations
-          : [{ replacement: movement.displaced, saleItem: null, transports: [] }];
-
-        compensations.forEach(compensation => {
-          const route = element("div", "compensation-route");
-          const replacementBranch = element("div", "branch compensation");
-          replacementBranch.append(element("div", "branch-title", "Bobina liberada"));
-          const replacement = compensation.replacement || movement.displaced;
-          if (replacement) {
-            addNode(replacementBranch, "Existencia sustituta", replacement, "replacement-node");
-            const meta = stockMeta(replacement);
-            if (meta) replacementBranch.append(element("div", "stock-meta", meta));
-          }
-
-          route.append(replacementBranch);
-          route.append(element("div", "arrow", "→"));
-
-          const destination = element("div", "branch compensation");
-          destination.append(element("div", "branch-title", "Pasa a ocupar el hueco"));
-          addNode(destination, "Item de venta", compensation.saleItem, "replacement-node");
-          addLabels(destination, "Transporte", compensation.transports);
-          if (!compensation.saleItem) {
-            destination.append(element("div", "node", "No se pudo completar la compensacion."));
-          }
-          route.append(destination);
-          wrap.append(route);
-        });
-        tree.append(wrap);
-      };
-
-      const renderMovement = (movement, index) => {
-        const details = element("details", "movement");
-        details.open = true;
-        const summary = element("summary");
-        summary.append(element("span", "index", String(index + 1)));
-
-        const titleWrap = element("div");
-        titleWrap.append(element("div", "stock-title", movement.actual?.label || "Existencia"));
-        titleWrap.append(element("div", "stock-meta", stockMeta(movement.actual)));
-        summary.append(titleWrap);
-        summary.append(element("span", "movement-kind", "Bobina definitiva"));
-        details.append(summary);
-
-        const tree = element("div", "tree");
-        const route = element("div", "route");
-
-        const before = element("div", "branch");
-        before.append(element("div", "branch-title", "Antes de la reasignacion"));
-        addLabels(before, "Item de venta", movement.before?.saleItems);
-        addLabels(before, "Transporte", movement.before?.transports);
-        if (!(movement.before?.saleItems || []).length && !(movement.before?.transports || []).length) {
-          before.append(element("div", "node", "Sin asignacion comercial anterior."));
-        }
-
-        const target = element("div", "branch target");
-        target.append(element("div", "branch-title", "Destino dictado por el albaran"));
-        addNode(target, "Item de venta", movement.target?.saleItem, "target-node");
-        addNode(target, "Transporte", movement.target?.transport, "target-node");
-
-        route.append(before);
-        route.append(element("div", "arrow", "→"));
-        route.append(target);
-        tree.append(route);
-        renderCompensation(movement, tree);
-        details.append(tree);
-
-        const searchable = JSON.stringify(movement).toLocaleLowerCase("es");
-        details.dataset.search = searchable;
-        return details;
-      };
-
       const render = payload => {
+        const movements = payload.movements || [];
+        const actualStocks = uniqueBy(movements.map(item => item.actual), stockKey);
+        const grossTotal = actualStocks.reduce(
+          (total, stock) => total + (Number.isFinite(stock?.gross) ? stock.gross : 0),
+          0
+        );
+
         document.title = `${payload.deliveryNote || "Albaran"} | Mapa de reasignacion`;
         document.querySelector("#title").textContent = payload.deliveryNote || "Mapa de reasignacion";
-
         const status = document.querySelector("#status");
         status.textContent = statusLabels[payload.status] || payload.status || "Resultado";
         status.className = `status ${payload.status || ""}`;
 
-        const movements = payload.movements || [];
-        const compensationCount = movements.reduce(
-          (total, movement) => total + (movement.compensations || []).length,
-          0
-        );
-        const metrics = [
-          [movements.length, "Bobinas definitivas"],
-          [compensationCount, "Compensaciones"],
-          [payload.scriptVersion || "-", "Version del script"]
-        ];
         const summary = document.querySelector("#summary");
-        metrics.forEach(([value, label]) => {
-          const metric = element("div", "metric");
-          metric.append(element("strong", "", String(value)));
-          metric.append(element("span", "", label));
-          summary.append(metric);
-        });
+        const count = element("span");
+        count.append(element("strong", "", String(actualStocks.length)));
+        count.append(document.createTextNode(" Bobinas"));
+        summary.append(count);
+        if (grossTotal) {
+          const weight = element("span");
+          weight.append(element("strong", "", `${grossTotal.toFixed(3)} t`));
+          weight.append(document.createTextNode(" Peso bruto"));
+          summary.append(weight);
+        }
+        const version = element("span");
+        version.append(element("strong", "", "Version"));
+        version.append(document.createTextNode(` ${payload.scriptVersion || "-"}`));
+        summary.append(version);
+        const print = element("button", "", "Imprimir");
+        print.type = "button";
+        print.addEventListener("click", () => window.print());
+        summary.append(print);
 
         renderNotices(payload);
-        const root = document.querySelector("#movements");
+        const diagram = document.querySelector("#diagram");
         if (!movements.length) {
-          root.append(element("div", "empty", "No hay movimientos que representar."));
-        } else {
-          movements.forEach((movement, index) => root.append(renderMovement(movement, index)));
+          diagram.append(element("div", "empty", "No hay movimientos que representar."));
+          return;
         }
 
-        document.querySelector("#filter").addEventListener("input", event => {
-          const query = event.target.value.trim().toLocaleLowerCase("es");
-          document.querySelectorAll(".movement").forEach(item => {
-            item.classList.toggle("hidden", query && !item.dataset.search.includes(query));
-          });
+        const delivery = element("section", "delivery-root");
+        const heading = element("div", "root-heading");
+        heading.append(element("small", "", "Albaran real / camion"));
+        heading.append(element("strong", "", payload.deliveryNote || "Albaran"));
+        delivery.append(heading);
+        addStockGrid(delivery, "Bobinas que realmente ha cargado", actualStocks, "picked");
+        diagram.append(delivery);
+
+        const groups = movementGroups(movements);
+        const flow = element("div", "flow");
+        flow.append(addStage("origin", "1. Antes | pedidos de origen", groups.origins, "origin"));
+        flow.append(element("div", "flow-arrow", "→"));
+        flow.append(addStage("target", "2. El albaran reasigna", groups.targets, "target"));
+        flow.append(element("div", "flow-arrow", "→"));
+        flow.append(addStage("after", "3. Despues | pedidos compensados", groups.compensations, "after"));
+        diagram.append(flow);
+
+        const legend = element("div", "legend");
+        [
+          ["picked", "Bobina cargada por el albaran"],
+          ["final", "Asignacion definitiva"],
+          ["replacement", "Bobina liberada / sustituta"]
+        ].forEach(([variant, label]) => {
+          const item = element("span");
+          item.append(element("i", `swatch ${variant}`));
+          item.append(document.createTextNode(label));
+          legend.append(item);
         });
-        document.querySelector("#expand").addEventListener("click", () => {
-          const items = [...document.querySelectorAll(".movement:not(.hidden)")];
-          const shouldOpen = items.some(item => !item.open);
-          items.forEach(item => { item.open = shouldOpen; });
-          document.querySelector("#expand").textContent =
-            shouldOpen ? "Contraer todo" : "Expandir todo";
-        });
-        document.querySelector("#print").addEventListener("click", () => window.print());
+        diagram.append(legend);
       };
 
       try {
@@ -553,7 +615,7 @@
       } catch (error) {
         document.querySelector("#status").textContent = "Enlace no valido";
         document.querySelector("#status").className = "status blocked";
-        document.querySelector("#movements").append(
+        document.querySelector("#diagram").append(
           element("div", "empty", error.message || "No se pudo abrir el mapa.")
         );
       }
