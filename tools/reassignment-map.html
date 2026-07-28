@@ -4,21 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
-  <title>Arbol de reasignacion de bobinas</title>
+  <title>Diagrama de reasignacion de bobinas</title>
   <style>
     :root {
       color-scheme: light;
       --ink: #202428;
       --muted: #687178;
-      --line: #c8cfd3;
+      --line: #c7ced2;
       --page: #f3f5f5;
       --surface: #fff;
       --brand: #7a0019;
       --brand-soft: #f7e9ed;
       --green: #176c48;
       --green-soft: #e4f3ec;
-      --blue: #1d5e87;
-      --blue-soft: #e7f1f7;
+      --blue: #17658f;
+      --blue-soft: #e7f2f8;
       --amber: #805500;
       --amber-soft: #fff3d7;
       --danger: #9e2b2b;
@@ -34,9 +34,8 @@
       font-size: 14px;
       letter-spacing: 0;
     }
-
     button { font: inherit; letter-spacing: 0; }
-    .shell { width: min(1180px, calc(100% - 28px)); margin: 0 auto; padding: 20px 0 42px; }
+    .shell { width: min(1440px, calc(100% - 28px)); margin: 0 auto; padding: 20px 0 42px; }
     header {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -62,7 +61,7 @@
       flex-wrap: wrap;
       gap: 18px;
       align-items: center;
-      margin: 12px 0 18px;
+      margin: 12px 0 16px;
       color: var(--muted);
       font-size: 12px;
     }
@@ -76,142 +75,195 @@
       padding: 6px 10px;
       cursor: pointer;
     }
-    .notice { margin: 10px 0; border-left: 4px solid var(--amber); background: var(--amber-soft); padding: 9px 12px; }
-    .notice.error { border-left-color: var(--danger); background: var(--danger-soft); }
-    .tree-title { margin: 24px 0 13px; font-size: 18px; }
-    .tree {
-      position: relative;
-      display: grid;
-      gap: 16px;
-      padding-left: 24px;
+    details.notice {
+      margin: 9px 0;
+      border-left: 4px solid var(--amber);
+      background: var(--amber-soft);
+      padding: 9px 12px;
     }
-    .tree::before {
-      content: "";
-      position: absolute;
-      left: 7px;
-      top: 0;
-      bottom: 18px;
-      border-left: 2px solid #aeb7bc;
-    }
-    .item {
-      position: relative;
-      border-top: 4px solid #737e84;
-      border-radius: 6px;
-      background: var(--surface);
-      box-shadow: 0 1px 2px rgba(20, 28, 33, .12);
-    }
-    .item.target { border-top-color: var(--brand); }
-    .item::before {
-      content: "";
-      position: absolute;
-      left: -17px;
-      top: 27px;
-      width: 17px;
-      border-top: 2px solid #aeb7bc;
-    }
-    .item-head {
-      display: flex;
-      gap: 14px;
-      align-items: flex-start;
-      justify-content: space-between;
-      padding: 13px 16px 11px;
-      border-bottom: 1px solid #e0e4e6;
-    }
-    .item-name { margin: 0; font-size: 18px; line-height: 1.2; }
-    .item-role {
-      flex: 0 0 auto;
-      border-radius: 4px;
-      background: #edf0f1;
-      color: #4f5b61;
-      padding: 4px 7px;
-      font-size: 11px;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-    .target .item-role { background: var(--brand-soft); color: var(--brand); }
-    .branch { position: relative; margin: 0 16px 0 30px; padding: 12px 0 12px 20px; border-left: 2px solid var(--line); }
-    .branch::before { content: ""; position: absolute; left: 0; top: 27px; width: 14px; border-top: 2px solid var(--line); }
-    .route {
+    details.notice.error { border-left-color: var(--danger); background: var(--danger-soft); }
+    details.notice summary { cursor: pointer; font-weight: 800; }
+    details.notice ul { margin: 8px 0 0; padding-left: 20px; }
+    .legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 7px;
-      align-items: center;
-      min-height: 29px;
+      gap: 16px;
+      margin: 18px 0 10px;
       color: var(--muted);
       font-size: 12px;
     }
-    .route-node {
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: #f7f8f8;
-      padding: 5px 8px;
-      color: var(--ink);
-      font-weight: 700;
+    .legend span { display: inline-flex; gap: 6px; align-items: center; }
+    .line-key { display: inline-block; width: 28px; border-top: 3px solid var(--blue); }
+    .line-key.delivery { border-top-color: var(--brand); border-top-style: dashed; }
+    .diagram-scroll { overflow-x: auto; padding-bottom: 8px; }
+    .diagram {
+      position: relative;
+      min-width: max(900px, 100%);
+      border: 1px solid #bcc5c9;
+      border-radius: 6px;
+      background: #e9eded;
+      overflow: hidden;
     }
-    .route-note { border-color: #d5aab4; background: var(--brand-soft); color: var(--brand); }
-    .route-arrow { font-weight: 900; color: #899399; }
-    .moves {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    .connections {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .state {
+      position: relative;
+      z-index: 2;
+      padding: 16px;
+      background: rgba(255, 255, 255, .92);
+    }
+    .state-head {
+      display: flex;
       gap: 12px;
-      padding: 0 16px 14px;
+      align-items: baseline;
+      margin-bottom: 12px;
     }
-    .move-group { min-width: 0; }
-    .move-title {
-      margin: 0 0 7px;
+    .state-number {
+      display: grid;
+      place-items: center;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 800;
+    }
+    .state h2 { margin: 0; font-size: 18px; }
+    .state-note { color: var(--muted); font-size: 12px; }
+    .contracts { display: flex; align-items: stretch; gap: 12px; }
+    .contract {
+      flex: 1 1 260px;
+      min-width: 220px;
+      border: 1px solid #aeb8bd;
+      border-radius: 5px;
+      background: #f7f8f8;
+      box-shadow: 0 1px 2px rgba(20, 28, 33, .08);
+    }
+    .contract-head {
+      min-height: 37px;
+      border-bottom: 1px solid var(--line);
+      padding: 9px 11px;
+      color: #4e5960;
+      font-size: 12px;
+      font-weight: 800;
+      text-align: center;
+      text-transform: uppercase;
+    }
+    .contract-items { display: flex; gap: 9px; align-items: stretch; padding: 9px; }
+    .sale-item {
+      flex: 1 1 210px;
+      min-width: 190px;
+      border: 1px solid #d0d6d9;
+      border-top: 4px solid #778289;
+      border-radius: 4px;
+      background: var(--surface);
+      padding: 9px;
+    }
+    .sale-item.target { border-top-color: var(--brand); }
+    .item-name {
+      min-height: 34px;
+      margin: 0 0 8px;
+      font-size: 14px;
+      line-height: 1.2;
+      text-align: center;
+    }
+    .coils { display: grid; grid-template-columns: repeat(auto-fit, minmax(142px, 1fr)); gap: 6px; }
+    .coil {
+      position: relative;
+      z-index: 5;
+      min-width: 0;
+      border: 1px solid #b8c1c6;
+      border-left: 4px solid #707b81;
+      border-radius: 4px;
+      background: #f8f9f9;
+      padding: 6px 7px;
+    }
+    .coil.delivery-stock {
+      border-color: #bd7b89;
+      border-left-color: var(--brand);
+      background: var(--brand-soft);
+    }
+    .coil.changed { box-shadow: inset 0 0 0 1px rgba(23, 101, 143, .18); }
+    .coil strong { display: block; overflow-wrap: anywhere; font-size: 12px; line-height: 1.15; }
+    .coil small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.25; }
+    .rest {
+      margin-top: 7px;
+      border: 1px dashed #aeb7bc;
+      border-radius: 4px;
+      background: #f0f2f2;
+      padding: 6px 8px;
       color: var(--muted);
       font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .empty { padding: 8px; color: var(--muted); font-size: 11px; text-align: center; }
+    .delivery-zone {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      justify-content: center;
+      min-height: 100px;
+      padding: 20px 16px 26px;
+      background: rgba(255, 255, 255, .92);
+    }
+    .delivery-node {
+      position: relative;
+      z-index: 5;
+      align-self: center;
+      max-width: 620px;
+      border: 2px solid var(--brand);
+      border-radius: 5px;
+      background: var(--brand-soft);
+      padding: 9px 14px;
+      color: var(--brand);
+      font-weight: 800;
+      text-align: center;
+    }
+    .delivery-node small { display: block; margin-top: 2px; color: #6d3a45; font-weight: 600; }
+    .divider {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-top: 1px solid #aeb7bc;
+      border-bottom: 1px solid #aeb7bc;
+      background: #dfe4e5;
+      padding: 8px 16px;
+      color: #445057;
+      font-size: 12px;
       font-weight: 800;
       text-transform: uppercase;
     }
-    .chips { display: flex; flex-wrap: wrap; gap: 7px; align-items: stretch; }
-    .coil {
-      display: grid;
-      grid-template-columns: auto;
-      gap: 1px;
-      min-width: 182px;
-      max-width: 260px;
-      border: 1px solid var(--line);
-      border-left: 4px solid #707b81;
-      border-radius: 5px;
-      background: #fafbfb;
-      padding: 7px 9px;
-    }
-    .coil.in { border-left-color: var(--green); background: var(--green-soft); }
-    .coil.out { border-left-color: var(--blue); background: var(--blue-soft); }
-    .coil strong { overflow-wrap: anywhere; font-size: 13px; }
-    .coil-meta, .coil-direction { color: var(--muted); font-size: 11px; line-height: 1.3; }
-    .coil-direction { color: var(--ink); font-weight: 700; }
-    .rest {
-      margin: 0 16px 15px;
-      border: 1px dashed #aeb7bc;
-      border-radius: 5px;
-      background: #f4f6f6;
-      padding: 8px 11px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .empty { color: var(--muted); font-size: 12px; }
+    .divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid #aeb7bc; }
+    .after { padding-bottom: 22px; }
     .fatal { margin-top: 20px; border: 1px solid #e0a7a7; background: var(--danger-soft); padding: 15px; }
 
     @media (max-width: 720px) {
-      .shell { width: min(100% - 18px, 1180px); padding-top: 12px; }
+      .shell { width: min(100% - 18px, 1440px); padding-top: 12px; }
       header { grid-template-columns: 1fr; align-items: start; }
       h1 { font-size: 23px; }
       .status { justify-self: start; }
       .summary { gap: 10px 16px; }
       .summary button { margin-left: 0; }
-      .tree { padding-left: 15px; }
-      .tree::before { left: 3px; }
-      .item::before { left: -12px; width: 12px; }
-      .item-head { padding: 12px; }
-      .item-name { font-size: 16px; }
-      .branch { margin: 0 12px 0 18px; padding-left: 13px; }
-      .branch::before { width: 9px; }
-      .moves { grid-template-columns: 1fr; padding: 0 12px 12px; }
-      .coil { min-width: min(100%, 210px); flex: 1 1 180px; max-width: none; }
-      .rest { margin: 0 12px 12px; }
+      .diagram { min-width: 900px; }
+      .state { padding: 12px; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .shell { width: 100%; padding: 0; }
+      .summary button, details.notice { display: none; }
+      .diagram-scroll { overflow: visible; }
+      .diagram { min-width: 0; }
     }
   </style>
 </head>
@@ -226,8 +278,13 @@
     </header>
     <div id="summary" class="summary"></div>
     <div id="notices"></div>
-    <h2 class="tree-title">Items de venta implicados</h2>
-    <section id="tree" class="tree"></section>
+    <div class="legend">
+      <span><i class="line-key delivery"></i> El albaran declara esta bobina</span>
+      <span><i class="line-key"></i> La bobina cambia de item</span>
+    </div>
+    <div class="diagram-scroll">
+      <section id="diagram" class="diagram"></section>
+    </div>
     <div id="fatal"></div>
   </main>
   <script>
@@ -238,173 +295,319 @@
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
-      const uniqueById = (values) => {
-        const seen = new Set();
-        return values.filter((value) => value?.id && !seen.has(value.id) && seen.add(value.id));
+      const statusText = {
+        applied: "Cambios aplicados",
+        reverted: "Cambios revertidos",
+        blocked: "Sin cambios",
       };
-      const stockMeta = (stock) => {
-        const parts = [];
-        if (Number.isFinite(stock?.gross)) parts.push(`${new Intl.NumberFormat("es-ES").format(stock.gross)} kg`);
-        if (stock?.location) parts.push(stock.location);
-        return parts.join(" | ");
-      };
-      const statusText = { applied: "Cambios aplicados", reverted: "Cambios revertidos", blocked: "Sin cambios" };
 
       function decodePayload() {
         const encoded = location.hash.slice(1);
         if (!encoded) throw new Error("El enlace no contiene datos de movimientos.");
-        const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - encoded.length % 4) % 4);
-        const binary = atob(base64);
-        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/")
+          + "=".repeat((4 - encoded.length % 4) % 4);
+        const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
         return JSON.parse(new TextDecoder().decode(bytes));
       }
 
       function itemContexts(payload) {
         if (Array.isArray(payload.saleItems) && payload.saleItems.length) return payload.saleItems;
-        const targets = [];
-        const donors = [];
+        const values = [];
         for (const movement of payload.movements || []) {
-          if (movement.target?.saleItem) targets.push({ ...movement.target.saleItem, role: "target", otherStockCount: null });
-          for (const item of movement.before?.saleItems || []) donors.push({ ...item, role: "donor", otherStockCount: null });
+          if (movement.target?.saleItem) values.push({ ...movement.target.saleItem, role: "target" });
+          for (const item of movement.before?.saleItems || []) values.push({ ...item, role: "donor" });
           for (const compensation of movement.compensations || []) {
-            if (compensation.saleItem) donors.push({ ...compensation.saleItem, role: "donor", otherStockCount: null });
+            if (compensation.saleItem) values.push({ ...compensation.saleItem, role: "donor" });
           }
         }
-        const targetItems = uniqueById(targets);
-        const targetIds = new Set(targetItems.map((item) => item.id));
-        return [...targetItems, ...uniqueById(donors).filter((item) => !targetIds.has(item.id))];
-      }
-
-      function transportRoutes(item, payload) {
-        const transports = [];
-        for (const movement of payload.movements || []) {
-          if (movement.target?.saleItem?.id === item.id && movement.target.transport) {
-            transports.push(movement.target.transport);
-          }
-          if (item.role !== "target") {
-            if ((movement.before?.saleItems || []).some((saleItem) => saleItem.id === item.id)) {
-              transports.push(...(movement.before?.transports || []));
-            }
-            for (const compensation of movement.compensations || []) {
-              if (compensation.saleItem?.id === item.id) transports.push(...(compensation.transports || []));
-            }
-          }
-        }
-        return uniqueById(transports);
-      }
-
-      function movementsForItem(item, payload) {
-        const incoming = [];
-        const outgoing = [];
-        for (const movement of payload.movements || []) {
-          const target = movement.target?.saleItem;
-          if (target?.id === item.id) {
-            if (movement.actual) incoming.push({ stock: movement.actual, direction: `Desde ${originLabel(movement)}` });
-            if (movement.displaced) outgoing.push({ stock: movement.displaced, direction: `Hacia ${compensationLabel(movement, movement.displaced)}` });
-          }
-          const isOriginal = (movement.before?.saleItems || []).some((saleItem) => saleItem.id === item.id);
-          if (isOriginal && movement.actual) {
-            outgoing.push({ stock: movement.actual, direction: `Hacia ${target?.label || "item de destino"}` });
-          }
-          for (const compensation of movement.compensations || []) {
-            if (compensation.saleItem?.id === item.id && compensation.replacement) {
-              incoming.push({ stock: compensation.replacement, direction: `Desde ${target?.label || "item de destino"}` });
-            }
-          }
-        }
-        return { incoming: dedupeMoves(incoming), outgoing: dedupeMoves(outgoing) };
-      }
-
-      function originLabel(movement) {
-        return (movement.before?.saleItems || []).map((item) => item.label).join(", ") || "sin item anterior";
-      }
-
-      function compensationLabel(movement, stock) {
-        const match = (movement.compensations || []).find((entry) => entry.replacement?.id === stock.id);
-        return match?.saleItem?.label || originLabel(movement);
-      }
-
-      function dedupeMoves(values) {
         const seen = new Set();
-        return values.filter((entry) => entry.stock?.id && !seen.has(entry.stock.id) && seen.add(entry.stock.id));
+        return values.filter((item) => item?.id && !seen.has(item.id) && seen.add(item.id));
       }
 
-      function coilHtml(entry, type) {
-        const meta = stockMeta(entry.stock);
-        return `<div class="coil ${type}">
-          <strong>${escapeHtml(entry.stock.label || entry.stock.id)}</strong>
-          ${meta ? `<span class="coil-meta">${escapeHtml(meta)}</span>` : ""}
-          <span class="coil-direction">${type === "in" ? "-> " : "<- "}${escapeHtml(entry.direction)}</span>
+      function stockIndex(payload) {
+        const stocks = new Map();
+        for (const movement of payload.movements || []) {
+          for (const stock of [
+            movement.actual,
+            movement.displaced,
+            ...(movement.compensations || []).map((entry) => entry.replacement),
+          ]) {
+            if (stock?.id) stocks.set(stock.id, stock);
+          }
+        }
+        return stocks;
+      }
+
+      function addAssignment(assignments, itemId, stock) {
+        if (!itemId || !stock?.id) return;
+        if (!assignments.has(itemId)) assignments.set(itemId, new Map());
+        assignments.get(itemId).set(stock.id, stock);
+      }
+
+      function buildAssignments(payload) {
+        const before = new Map();
+        const after = new Map();
+        for (const movement of payload.movements || []) {
+          for (const item of movement.before?.saleItems || []) {
+            addAssignment(before, item.id, movement.actual);
+          }
+          addAssignment(before, movement.target?.saleItem?.id, movement.displaced);
+          addAssignment(after, movement.target?.saleItem?.id, movement.actual);
+          for (const compensation of movement.compensations || []) {
+            addAssignment(after, compensation.saleItem?.id, compensation.replacement);
+          }
+        }
+        return { before, after };
+      }
+
+      function assignmentOwners(assignments) {
+        const owners = new Map();
+        for (const [itemId, stocks] of assignments) {
+          for (const stockId of stocks.keys()) owners.set(stockId, itemId);
+        }
+        return owners;
+      }
+
+      function contractGroups(items) {
+        const groups = new Map();
+        for (const item of items) {
+          const contract = item.saleContract || {
+            id: `missing-${item.id}`,
+            label: "Contrato no disponible en este enlace",
+          };
+          if (!groups.has(contract.id)) groups.set(contract.id, { contract, items: [] });
+          groups.get(contract.id).items.push(item);
+        }
+        return [...groups.values()];
+      }
+
+      function coilHtml(stock, state, deliveryIds, changedIds) {
+        const meta = [];
+        if (Number.isFinite(stock?.gross)) {
+          meta.push(`${new Intl.NumberFormat("es-ES").format(stock.gross)} kg`);
+        }
+        if (stock?.location) meta.push(stock.location);
+        const classes = [
+          "coil",
+          deliveryIds.has(stock.id) && state === "before" ? "delivery-stock" : "",
+          changedIds.has(stock.id) ? "changed" : "",
+        ].filter(Boolean).join(" ");
+        return `<div class="${classes}" data-state="${state}" data-stock-id="${escapeHtml(stock.id)}">
+          <strong>${escapeHtml(stock.label || stock.id)}</strong>
+          ${meta.length ? `<small>${escapeHtml(meta.join(" | "))}</small>` : ""}
         </div>`;
       }
 
-      function moveGroup(title, values, type) {
-        return `<section class="move-group">
-          <h4 class="move-title">${escapeHtml(title)} (${values.length})</h4>
-          <div class="chips">${values.length ? values.map((value) => coilHtml(value, type)).join("") : '<span class="empty">Ninguna</span>'}</div>
-        </section>`;
-      }
-
-      function itemHtml(item, payload) {
-        const routes = transportRoutes(item, payload);
-        const moves = movementsForItem(item, payload);
-        const routeHtml = routes.length
-          ? routes.map((transport) => `<span class="route-node">${escapeHtml(transport.label)}</span>${item.role === "target" ? `<span class="route-arrow">-></span><span class="route-node route-note">Albaran ${escapeHtml(payload.deliveryNote)}</span>` : ""}`).join("")
-          : '<span class="empty">Sin transporte relacionado en los datos del movimiento</span>';
+      function itemHtml(item, state, assignments, deliveryIds, changedIds) {
+        const stocks = [...(assignments.get(item.id)?.values() || [])];
         const rest = Number.isFinite(item.otherStockCount)
           ? `Resto de existencias (${item.otherStockCount})`
-          : "Resto de existencias (dato no disponible en este enlace antiguo)";
-        return `<article class="item ${item.role === "target" ? "target" : "donor"}">
-          <div class="item-head">
-            <h3 class="item-name">${escapeHtml(item.label)}</h3>
-            <span class="item-role">${item.role === "target" ? "Contiene el albaran" : "Item compensado"}</span>
-          </div>
-          <div class="branch"><div class="route">${routeHtml}</div></div>
-          <div class="moves">
-            ${moveGroup("Entran", moves.incoming, "in")}
-            ${moveGroup("Salen", moves.outgoing, "out")}
+          : "Resto no disponible";
+        return `<article class="sale-item ${item.role === "target" ? "target" : ""}">
+          <h3 class="item-name">${escapeHtml(item.label)}</h3>
+          <div class="coils">
+            ${stocks.length
+              ? stocks.map((stock) => coilHtml(stock, state, deliveryIds, changedIds)).join("")
+              : '<div class="empty">Sin bobinas implicadas en este estado</div>'}
           </div>
           <div class="rest">${escapeHtml(rest)}</div>
         </article>`;
       }
 
+      function stateHtml(title, note, state, items, assignments, deliveryIds, changedIds) {
+        const groups = contractGroups(items);
+        return `<section class="state ${state}">
+          <div class="state-head">
+            <span class="state-number">${state === "before" ? "1" : "2"}</span>
+            <h2>${escapeHtml(title)}</h2>
+            <span class="state-note">${escapeHtml(note)}</span>
+          </div>
+          <div class="contracts">
+            ${groups.map(({ contract, items: contractItems }) => `
+              <section class="contract">
+                <div class="contract-head">${escapeHtml(contract.label)}</div>
+                <div class="contract-items">
+                  ${contractItems.map((item) =>
+                    itemHtml(item, state, assignments, deliveryIds, changedIds)
+                  ).join("")}
+                </div>
+              </section>`).join("")}
+          </div>
+        </section>`;
+      }
+
+      function afterTitle(status) {
+        if (status === "blocked") return ["Resultado propuesto", "No se ha aplicado"];
+        if (status === "reverted") return ["Movimiento calculado", "Fue revertido"];
+        return ["Despues", "Asignacion aplicada"];
+      }
+
+      function deliveryTransportLabel(payload) {
+        const labels = [];
+        const seen = new Set();
+        for (const movement of payload.movements || []) {
+          const transport = movement.target?.transport;
+          if (transport?.id && !seen.has(transport.id)) {
+            seen.add(transport.id);
+            labels.push(transport.label);
+          }
+        }
+        return labels.join(" | ");
+      }
+
       function renderNotices(payload) {
         const container = document.getElementById("notices");
-        for (const message of payload.errors || []) {
-          container.insertAdjacentHTML("beforeend", `<div class="notice error"><strong>Error:</strong> ${escapeHtml(message)}</div>`);
+        const groups = [
+          ["error", "Errores", payload.errors || []],
+          ["warning", "Avisos", payload.warnings || []],
+        ];
+        for (const [kind, title, messages] of groups) {
+          if (!messages.length) continue;
+          container.insertAdjacentHTML("beforeend", `
+            <details class="notice ${kind === "error" ? "error" : ""}">
+              <summary>${messages.length} ${escapeHtml(title.toLowerCase())}</summary>
+              <ul>${messages.map((message) => `<li>${escapeHtml(message)}</li>`).join("")}</ul>
+            </details>`);
         }
-        for (const message of payload.warnings || []) {
-          container.insertAdjacentHTML("beforeend", `<div class="notice"><strong>Aviso:</strong> ${escapeHtml(message)}</div>`);
+      }
+
+      function drawPath(svg, start, end, className, marker) {
+        const delta = Math.max(55, Math.abs(end.y - start.y) * .38);
+        const direction = end.y >= start.y ? 1 : -1;
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute(
+          "d",
+          `M ${start.x} ${start.y} C ${start.x} ${start.y + delta * direction}, ${end.x} ${end.y - delta * direction}, ${end.x} ${end.y}`
+        );
+        path.setAttribute("fill", "none");
+        path.setAttribute("class", className);
+        path.setAttribute("marker-end", `url(#${marker})`);
+        svg.append(path);
+      }
+
+      function point(element, diagramRect, edge) {
+        const rect = element.getBoundingClientRect();
+        return {
+          x: rect.left - diagramRect.left + rect.width / 2,
+          y: edge === "top" ? rect.top - diagramRect.top : rect.bottom - diagramRect.top,
+        };
+      }
+
+      function drawConnections(payload, changedIds) {
+        const diagram = document.getElementById("diagram");
+        const svg = diagram.querySelector(".connections");
+        if (!svg) return;
+        svg.querySelectorAll(".movement-path, .delivery-path")
+          .forEach((path) => path.remove());
+        const diagramRect = diagram.getBoundingClientRect();
+        svg.setAttribute("viewBox", `0 0 ${diagramRect.width} ${diagramRect.height}`);
+
+        const beforeNodes = new Map(
+          [...diagram.querySelectorAll('[data-state="before"][data-stock-id]')]
+            .map((node) => [node.dataset.stockId, node])
+        );
+        const afterNodes = new Map(
+          [...diagram.querySelectorAll('[data-state="after"][data-stock-id]')]
+            .map((node) => [node.dataset.stockId, node])
+        );
+        for (const stockId of changedIds) {
+          const before = beforeNodes.get(stockId);
+          const after = afterNodes.get(stockId);
+          if (!before || !after) continue;
+          drawPath(
+            svg,
+            point(before, diagramRect, "bottom"),
+            point(after, diagramRect, "top"),
+            "movement-path",
+            "movement-arrow"
+          );
+        }
+
+        const deliveryNode = diagram.querySelector(".delivery-node");
+        if (!deliveryNode) return;
+        const actualIds = new Set(
+          (payload.movements || []).map((movement) => movement.actual?.id).filter(Boolean)
+        );
+        for (const stockId of actualIds) {
+          const stockNode = beforeNodes.get(stockId);
+          if (!stockNode) continue;
+          drawPath(
+            svg,
+            point(deliveryNode, diagramRect, "top"),
+            point(stockNode, diagramRect, "bottom"),
+            "delivery-path",
+            "delivery-arrow"
+          );
         }
       }
 
       function render(payload) {
         const status = payload.status || "blocked";
+        const items = itemContexts(payload);
+        const assignments = buildAssignments(payload);
+        const beforeOwners = assignmentOwners(assignments.before);
+        const afterOwners = assignmentOwners(assignments.after);
+        const stocks = stockIndex(payload);
+        const changedIds = new Set(
+          [...stocks.keys()].filter((id) =>
+            beforeOwners.has(id) && afterOwners.has(id) && beforeOwners.get(id) !== afterOwners.get(id)
+          )
+        );
+        const deliveryIds = new Set(
+          (payload.movements || []).map((movement) => movement.actual?.id).filter(Boolean)
+        );
+        const [resultTitle, resultNote] = afterTitle(status);
+
         document.getElementById("title").textContent = payload.deliveryNote || "Albaran";
         const statusElement = document.getElementById("status");
         statusElement.className = `status ${status}`;
         statusElement.textContent = statusText[status] || status;
-        const items = itemContexts(payload);
-        const stockIds = new Set((payload.movements || []).flatMap((movement) => [
-          movement.actual?.id,
-          movement.displaced?.id,
-          ...(movement.compensations || []).map((entry) => entry.replacement?.id),
-        ].filter(Boolean)));
         document.getElementById("summary").innerHTML = `
           <span><strong>${items.length}</strong> items de venta</span>
-          <span><strong>${stockIds.size}</strong> bobinas implicadas</span>
+          <span><strong>${stocks.size}</strong> bobinas implicadas</span>
+          <span><strong>${changedIds.size}</strong> cambian de item</span>
           <span>Version ${escapeHtml(payload.scriptVersion || "anterior")}</span>
           <button type="button" onclick="window.print()">Imprimir</button>`;
         renderNotices(payload);
-        document.getElementById("tree").innerHTML = items.length
-          ? items.map((item) => itemHtml(item, payload)).join("")
-          : '<div class="fatal">No hay items de venta que mostrar.</div>';
+
+        const transport = deliveryTransportLabel(payload);
+        document.getElementById("diagram").innerHTML = `
+          <svg class="connections" aria-hidden="true">
+            <defs>
+              <marker id="movement-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                <path d="M 0 0 L 8 4 L 0 8 z" fill="#17658f"></path>
+              </marker>
+              <marker id="delivery-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                <path d="M 0 0 L 8 4 L 0 8 z" fill="#7a0019"></path>
+              </marker>
+            </defs>
+            <style>
+              .movement-path { stroke: #17658f; stroke-width: 2.5; opacity: .72; }
+              .delivery-path { stroke: #7a0019; stroke-width: 2; stroke-dasharray: 6 4; opacity: .72; }
+            </style>
+          </svg>
+          ${stateHtml("Antes", "Asignacion previa", "before", items, assignments.before, deliveryIds, changedIds)}
+          <div class="delivery-zone">
+            <div class="delivery-node">
+              Albaran ${escapeHtml(payload.deliveryNote || "")}
+              ${transport ? `<small>${escapeHtml(transport)}</small>` : ""}
+            </div>
+          </div>
+          <div class="divider">Reasignacion</div>
+          ${stateHtml(resultTitle, resultNote, "after", items, assignments.after, deliveryIds, changedIds)}`;
+
+        requestAnimationFrame(() => drawConnections(payload, changedIds));
+        let resizeTimer;
+        window.addEventListener("resize", () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => drawConnections(payload, changedIds), 80);
+        });
       }
 
       try {
         render(decodePayload());
       } catch (error) {
-        document.getElementById("title").textContent = "No se pudo abrir el arbol";
+        document.getElementById("title").textContent = "No se pudo abrir el diagrama";
         document.getElementById("status").textContent = "Error";
         document.getElementById("status").className = "status blocked";
         document.getElementById("fatal").innerHTML = `<div class="fatal">${escapeHtml(error.message)}</div>`;
