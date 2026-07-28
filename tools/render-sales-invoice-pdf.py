@@ -120,6 +120,7 @@ EXISTENCIA = {
     "peso": "fldjnWnawgEqOIKgu",
     "pl": "fldKrns7X3mkA8R9a",
     "barco": "fldrdf8Hybz4oMEcd",
+    "albaranes": "fldQXQ6OFKoJ6gRbl",
     "precio_venta": "fldxMzVEgXDZiTj2P",
     "valor_venta": "fldgohky23L3qMjC9",
     "descripcion": "fldCzDd5UMrc0UZo5",
@@ -159,6 +160,7 @@ MATERIAL = {
 }
 TIPO_MATERIAL = {"nombre": "fldYe0hoT3OWTfwA1"}
 BARCO = {"nombre": "fldPOt1yGRROvj6fa"}
+ALBARAN = {"numero": "fldjrtHKaG5852QC9"}
 INCOTERM = {"nombre": "fldPX1GEsaBR4rzMd"}
 TERMINO = {"nombre": "fldVtyWKQXXoz2VHc"}
 CLIENTE = {
@@ -177,6 +179,7 @@ TABLES = {
     "materiales": "tbldcH54bb4nIP2Ts",
     "tipos_material": "tblVYEUxcX8xtyUsv",
     "barcos": "tblApIqakkmlO73gM",
+    "albaranes": "tblEKrWWzyZQ54pWl",
     "incoterms": "tblynLHJbKXFrLhTc",
     "terminos": "tbl5psJrD0ezwtSzN",
     "clientes": "tbliyYuo9mWCnHGUG",
@@ -250,6 +253,9 @@ class InvoiceData:
     currency: str = "EUR"
     currency_symbol: str = EURO
     customer_code: str = ""
+    ships: list[str] = field(default_factory=list)
+    sales_contracts: list[str] = field(default_factory=list)
+    delivery_notes: list[str] = field(default_factory=list)
     mode: str = "detail"
     detail_lines: list[Line] = field(default_factory=list)
     weight_mode: str = "gross"
@@ -852,6 +858,7 @@ def build_invoice(
     materiales = index(load_table(records_dir, "Materiales"))
     tipos_material = index(load_table(records_dir, "Tipos_de_material"))
     barcos = index(load_table(records_dir, "Barcos"))
+    albaranes = index(load_table(records_dir, "Albaranes"))
     incoterms = index(load_table(records_dir, "Incoterms"))
     terminos = index(load_table(records_dir, "Terminos_de_pago"))
     clientes = index(load_table(records_dir, "Clientes"))
@@ -883,6 +890,7 @@ def build_invoice(
         materiales=materiales,
         tipos_material=tipos_material,
         barcos=barcos,
+        albaranes=albaranes,
         incoterms=incoterms,
         terminos=terminos,
         clientes=clientes,
@@ -927,6 +935,7 @@ def build_invoice_live(
     existencia_records = list(existencias.values())
     material_ids = collect_link_ids(existencia_records, EXISTENCIA["material"])
     barco_ids = collect_link_ids(existencia_records, EXISTENCIA["barco"])
+    albaran_ids = collect_link_ids(existencia_records, EXISTENCIA["albaranes"])
     item_ids = collect_link_ids(existencia_records, EXISTENCIA["item_venta"])
 
     items_venta = fetch_records_by_ids(base_id, TABLES["items_venta"], item_ids, token)
@@ -936,6 +945,7 @@ def build_invoice_live(
         base_id, TABLES["tipos_material"], tipo_material_ids, token
     )
     barcos = fetch_records_by_ids(base_id, TABLES["barcos"], barco_ids, token)
+    albaranes = fetch_records_by_ids(base_id, TABLES["albaranes"], albaran_ids, token)
     incoterms = fetch_records_by_ids(base_id, TABLES["incoterms"], incoterm_ids, token)
     terminos = fetch_records_by_ids(base_id, TABLES["terminos"], termino_ids, token)
     clientes = fetch_records_by_ids(base_id, TABLES["clientes"], cliente_ids, token)
@@ -948,6 +958,7 @@ def build_invoice_live(
         materiales=materiales,
         tipos_material=tipos_material,
         barcos=barcos,
+        albaranes=albaranes,
         incoterms=incoterms,
         terminos=terminos,
         clientes=clientes,
@@ -1082,6 +1093,13 @@ def build_invoice_from_payload(
         currency=currency,
         currency_symbol=scalar_text(payload.get("currencySymbol")) or currency_symbol_for(currency),
         customer_code=scalar_text(payload.get("customerCode")),
+        ships=unique_texts([scalar_text(value) for value in payload.get("ships", [])]),
+        sales_contracts=unique_texts(
+            [scalar_text(value) for value in payload.get("salesContracts", [])]
+        ),
+        delivery_notes=unique_texts(
+            [scalar_text(value) for value in payload.get("deliveryNotes", [])]
+        ),
         detail_lines=lines,
         weight_mode=normalise_weight_mode(payload.get("weightMode")) or infer_weight_mode(lines),
     )
@@ -1096,6 +1114,7 @@ def build_invoice_from_records(
     materiales: dict[str, dict[str, Any]],
     tipos_material: dict[str, dict[str, Any]],
     barcos: dict[str, dict[str, Any]],
+    albaranes: dict[str, dict[str, Any]],
     incoterms: dict[str, dict[str, Any]],
     terminos: dict[str, dict[str, Any]],
     clientes: dict[str, dict[str, Any]],
@@ -1232,6 +1251,24 @@ def build_invoice_from_records(
     internal_order = ", ".join(
         scalar_text(get_field(record, VENTA["contrato"])) for record in venta_records
     )
+    ships = unique_texts(
+        [
+            scalar_text(ship)
+            for record in line_records
+            for ship in values(get_field(record, EXISTENCIA["barco"]))
+        ]
+    )
+    sales_contracts = unique_texts(
+        [scalar_text(get_field(record, VENTA["contrato"])) for record in venta_records]
+    )
+    delivery_notes = unique_texts(
+        [
+            scalar_text(get_field(albaranes.get(albaran_id), ALBARAN["numero"]))
+            for record in line_records
+            for albaran_id in values(get_field(record, EXISTENCIA["albaranes"]))
+            if albaran_id in albaranes
+        ]
+    )
     customer_order_candidates = [
         scalar_text(get_field(record, VENTA["numero_pedido"])) for record in venta_records
     ]
@@ -1288,6 +1325,9 @@ def build_invoice_from_records(
         packing_lists=unique_texts([line.packing for line in lines]),
         currency=currency,
         currency_symbol=currency_symbol_for(currency),
+        ships=ships,
+        sales_contracts=sales_contracts,
+        delivery_notes=delivery_notes,
         detail_lines=lines,
         weight_mode=infer_weight_mode(lines),
     )
@@ -1540,7 +1580,7 @@ def table_layout(show_summary: bool, mode: str = "detail") -> dict[str, float]:
     y_bottom = 182.0 if show_summary else 70.0
     header_h = 13.0
     category_h = 22.0
-    summary_h = 110.0 if show_summary else 0.0
+    summary_h = 170.0 if show_summary else 0.0
     line_area = y_top - y_bottom - header_h - category_h - summary_h
     return {
         "x": x,
@@ -1657,12 +1697,38 @@ def draw_table_page(c: canvas.Canvas, invoice: InvoiceData, page_lines: list[Lin
         return y_bottom
 
     summary_top = y_bottom + summary_h
+    totals_top = y_bottom + 110
     c.setLineWidth(0.6)
-    c.line(x, summary_top, x + table_w, summary_top)
+    c.line(x, totals_top, x + table_w, totals_top)
     total_row_top = y_bottom + 28
     c.line(x, total_row_top, x + table_w, total_row_top)
 
-    y = summary_top - 18
+    metadata_rows = [
+        ("VESSEL" if len(invoice.ships) == 1 else "VESSELS", invoice.ships),
+        (
+            "SALES CONTRACT" if len(invoice.sales_contracts) == 1 else "SALES CONTRACTS",
+            invoice.sales_contracts,
+        ),
+        (
+            "DELIVERY NOTE" if len(invoice.delivery_notes) == 1 else "DELIVERY NOTES",
+            invoice.delivery_notes,
+        ),
+    ]
+    metadata_y = y - 8
+    for index, (label, values_list) in enumerate(metadata_rows):
+        value = " / ".join(values_list) or "-"
+        c.setFont(BOLD_FONT, 6.4)
+        c.drawString(x + 5, metadata_y, f"{label}:")
+        label_width = c.stringWidth(f"{label}:", BOLD_FONT, 6.4)
+        c.setFont(REGULAR_FONT, 6.4)
+        c.drawString(
+            x + 9 + label_width,
+            metadata_y,
+            fit_text(c, value, table_w - label_width - 18, REGULAR_FONT, 6.4),
+        )
+        metadata_y -= 20 if index == 0 else 12
+
+    y = totals_top - 18
     c.setFont(BOLD_FONT, 6.9)
     if invoice.discount_lines:
         draw_right_fit(c, fmt_money(invoice.line_subtotal, invoice.currency_symbol), col_x[4] - 4, y, amount_w - 6, BOLD_FONT, 6.9)
