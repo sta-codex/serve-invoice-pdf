@@ -58,7 +58,7 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
             xml = replaceOriginLine(xml, `ORIGEN: ${origin}`);
           }
           xml = updateStorageLine(xml, getStorageRate(confirmation));
-          xml = replaceSignatureBlockWithConfirmationNote(xml);
+          xml = replaceSignatureBlockWithConfirmationNote(xml, confirmation);
           xml = removePackingLine(xml);
           xml = removeBankDetails(xml, isTransferPaymentTerm(confirmation.paymentTerms));
           xml = replaceDocumentCertificateLine(xml);
@@ -664,7 +664,11 @@ function replaceParagraphRuns(paragraph, runs) {
   const baseRunProps = firstRunXml.match(/<w:rPr>([\s\S]*?)<\/w:rPr>/)?.[1] || "";
   const plainRunProps = removeBoldFromRunProps(baseRunProps);
   const replacementRuns = runs
-    .map(({ text, bold }) => buildTextRun(text, bold ? addBoldToRunProps(plainRunProps) : plainRunProps))
+    .map(({ text, bold, break: lineBreak }) =>
+      lineBreak
+        ? buildBreakRun(plainRunProps)
+        : buildTextRun(text, bold ? addBoldToRunProps(plainRunProps) : plainRunProps)
+    )
     .join("");
   const start = runMatches[0].index;
   const lastRun = runMatches.at(-1);
@@ -672,6 +676,15 @@ function replaceParagraphRuns(paragraph, runs) {
   const end = lastRun.index + lastRun[0].length;
 
   return `${normalizedParagraph.slice(0, start)}${replacementRuns}${normalizedParagraph.slice(end)}`;
+}
+
+function buildBreakRun(runProps) {
+  return [
+    "<w:r>",
+    runProps ? `<w:rPr>${runProps}</w:rPr>` : "",
+    "<w:br/>",
+    "</w:r>"
+  ].join("");
 }
 
 function buildTextRun(text, runProps) {
@@ -1097,7 +1110,7 @@ function normalizeLegalCommonNouns(xml) {
   );
 }
 
-function replaceSignatureBlockWithConfirmationNote(xml) {
+function replaceSignatureBlockWithConfirmationNote(xml, confirmation = {}) {
   const paragraphMatches = [...xml.matchAll(/<w:p[\s\S]*?<\/w:p>/g)];
   const paragraphs = paragraphMatches.map((match) => match[0]);
   const headerParagraphIndex = paragraphs.findIndex((paragraph) => {
@@ -1125,11 +1138,15 @@ function replaceSignatureBlockWithConfirmationNote(xml) {
 
   const sourceParagraph = findPreviousBodyParagraph(paragraphs, headerParagraphIndex) ||
     paragraphs[signatureParagraphIndex];
+  const specialConditionsParagraphs = buildSpecialConditionsParagraphs(
+    sourceParagraph,
+    confirmation.specialConditions
+  );
   const confirmationParagraph = buildFinalConfirmationParagraph(sourceParagraph);
 
   const start = headerMatch.index;
   const end = signatureMatch.index + signatureMatch[0].length;
-  return `${xml.slice(0, start)}${confirmationParagraph}${xml.slice(end)}`;
+  return `${xml.slice(0, start)}${specialConditionsParagraphs}${confirmationParagraph}${xml.slice(end)}`;
 }
 
 function findPreviousBodyParagraph(paragraphs, beforeIndex) {
@@ -1150,6 +1167,41 @@ function buildFinalConfirmationParagraph(sourceParagraph) {
       ),
       "both"
     )
+  );
+}
+
+function buildSpecialConditionsParagraphs(sourceParagraph, specialConditions) {
+  const text = String(specialConditions || "");
+  if (!text.trim()) return "";
+
+  const titleParagraph = removeParagraphIndentation(
+    setParagraphJustification(
+      setParagraphBold(
+        replaceParagraphText(sourceParagraph, "CONDICIONES ESPECIALES")
+      ),
+      "both"
+    )
+  );
+  const bodyParagraph = removeParagraphIndentation(
+    setParagraphJustification(
+      replaceParagraphTextPreservingLineBreaks(sourceParagraph, text),
+      "both"
+    )
+  );
+
+  return `${titleParagraph}${bodyParagraph}`;
+}
+
+function replaceParagraphTextPreservingLineBreaks(paragraph, replacement) {
+  const lines = String(replacement).split(/\r\n|\r|\n/);
+  return replaceParagraphRuns(
+    paragraph,
+    lines.flatMap((line, index) => {
+      const items = [];
+      if (index > 0) items.push({ break: true });
+      items.push({ text: line, bold: false });
+      return items;
+    })
   );
 }
 

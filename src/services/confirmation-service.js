@@ -75,6 +75,7 @@ const ITEM_VENTA_NETO_BRUTO_CLIENTE_FIELD_ID = "fldXSSM3nOKtANoHO";
 const DELIVERY_PLACE_TABLE_ID = "tblXhYWu2uQfbiPN7";
 const DELIVERY_PLACE_NAME_FIELD_ID = "fldhsacdoe0Y9z23n";
 const DELIVERY_PLACE_TYPE_FIELD_ID = "fldFykk49X29FAIPn";
+const SPECIAL_CONDITIONS_FIELD_NAME = "Condiciones especiales";
 const CONFIRMATION_ITEM_VENTA_FIELD_IDS = [
   ...new Set([
     ...ITEM_VENTA_FIELD_IDS,
@@ -124,6 +125,14 @@ export async function loadConfirmationFromAirtable({
   }
 
   const contractFields = fieldsOf(contractRecord);
+  const contractNamedRecords = await client.listRecordsByIdsWithFieldNames(
+    tables.salesContracts,
+    [recordId],
+    [SPECIAL_CONDITIONS_FIELD_NAME]
+  );
+  const specialConditions = rawTextField(
+    fieldsOf(contractNamedRecords[0])[SPECIAL_CONDITIONS_FIELD_NAME]
+  );
   const downPaymentRecords = await client.listRecordsByIds(
     tables.downPayments,
     recordIds(contractFields[CONTRATO_VENTA.ANTICIPOS]),
@@ -176,7 +185,8 @@ export async function loadConfirmationFromAirtable({
     downPaymentRecords,
     linkedNames,
     company: config.company,
-    quantitySource
+    quantitySource,
+    specialConditions
   });
 }
 
@@ -190,7 +200,8 @@ function normalizeConfirmation({
   downPaymentRecords,
   linkedNames,
   company,
-  quantitySource
+  quantitySource,
+  specialConditions
 }) {
   const fields = fieldsOf(record);
   const purchaseItemsById = new Map(
@@ -244,6 +255,7 @@ function normalizeConfirmation({
       fields[CONTRATO_VENTA.TERMINOS_PAGO],
       linkedNames.paymentTerms
     ),
+    specialConditions,
     downPayments: normalizeDownPayments(downPaymentRecords),
     toleranceMinus: numberValue(fields[CONTRATO_VENTA.TOLERANCIA_MENOS]),
     tolerancePlus: numberValue(fields[CONTRATO_VENTA.TOLERANCIA_MAS]),
@@ -266,6 +278,12 @@ function normalizeConfirmation({
     totalQuantity,
     quantitySource: normalizeQuantitySource(quantitySource)
   };
+}
+
+function rawTextField(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  return firstText(value);
 }
 
 function normalizeDownPayments(records) {

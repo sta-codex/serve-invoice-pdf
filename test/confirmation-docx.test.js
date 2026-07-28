@@ -592,6 +592,44 @@ test("replaces signature block with final confirmation paragraph in all formats"
   }
 });
 
+test("adds optional special conditions before final confirmation paragraph", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      specialConditions: "Primera condición especial.\nSegunda condición especial."
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+  const text = extractDocumentText(documentXml);
+
+  const forceMajeureIndex = text.indexOf("Fuerza mayor es el evento imprevisto");
+  const titleIndex = text.indexOf("CONDICIONES ESPECIALES");
+  const bodyIndex = text.indexOf("Primera condición especial.Segunda condición especial.");
+  const finalIndex = text.indexOf("Salvo comunicación expresa en contra");
+
+  assert.ok(forceMajeureIndex >= 0);
+  assert.ok(titleIndex > forceMajeureIndex);
+  assert.ok(bodyIndex > titleIndex);
+  assert.ok(finalIndex > bodyIndex);
+  assert.match(documentXml, /<w:br\/>/);
+});
+
+test("omits special conditions section when it is empty", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      specialConditions: "   "
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+
+  assert.doesNotMatch(extractDocumentText(documentXml), /CONDICIONES ESPECIALES/);
+});
+
 test("shows storage line only for eligible client delivery places with rate by material type", async () => {
   const modes = ["formato1", "formato2", "formato3"];
   for (const mode of modes) {
