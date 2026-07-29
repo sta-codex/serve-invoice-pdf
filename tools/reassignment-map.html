@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
-  <title>Diagrama de reasignacion de bobinas</title>
+  <title>Diagrama de reasignacion de material</title>
   <style>
     :root {
       color-scheme: light;
@@ -297,7 +297,7 @@
   <main class="shell">
     <header>
       <div>
-        <div class="eyebrow">Reasignacion de bobinas</div>
+        <div id="eyebrow" class="eyebrow">Reasignacion de material</div>
         <h1 id="title">Cargando movimientos...</h1>
       </div>
       <div id="status" class="status">Cargando</div>
@@ -305,7 +305,7 @@
     <div id="summary" class="summary"></div>
     <div id="notices"></div>
     <div class="legend">
-      <span><i class="line-key"></i> La bobina cambia de item</span>
+      <span id="movement-legend"><i class="line-key"></i> El material cambia de item</span>
     </div>
     <div class="diagram-scroll">
       <section id="diagram" class="diagram"></section>
@@ -314,6 +314,8 @@
   </main>
   <script>
     (() => {
+      let materialSingular = "bobina";
+      let materialPlural = "bobinas";
       const escapeHtml = (value) => String(value ?? "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
@@ -434,7 +436,7 @@
           <div class="coils">
             ${stocks.length
               ? stocks.map((stock) => coilHtml(stock, state, deliveryIds, changedIds)).join("")
-              : '<div class="empty">Sin bobinas implicadas en este estado</div>'}
+              : `<div class="empty">Sin ${escapeHtml(materialPlural)} implicadas en este estado</div>`}
           </div>
           <div class="rest">${escapeHtml(rest)}</div>
         </article>`;
@@ -620,6 +622,14 @@
       }
 
       function render(payload) {
+        materialSingular = payload.materialSingular || "bobina";
+        materialPlural = payload.materialPlural || "bobinas";
+        document.title = `Diagrama de reasignacion de ${materialPlural}`;
+        document.getElementById("eyebrow").textContent =
+          `Reasignacion de ${materialPlural}`;
+        document.getElementById("movement-legend").innerHTML =
+          `<i class="line-key"></i> La ${escapeHtml(materialSingular)} cambia de item`;
+
         const status = payload.status || "blocked";
         const items = itemContexts(payload);
         const assignments = buildAssignments(payload);
@@ -642,7 +652,7 @@
         statusElement.textContent = statusText[status] || status;
         document.getElementById("summary").innerHTML = `
           <span><strong>${items.length}</strong> items de venta</span>
-          <span><strong>${stocks.size}</strong> bobinas implicadas</span>
+          <span><strong>${stocks.size}</strong> ${escapeHtml(materialPlural)} implicadas</span>
           <span><strong>${changedIds.size}</strong> cambian de item</span>
           <span>Version ${escapeHtml(payload.scriptVersion || "anterior")}</span>
           <button type="button" onclick="window.print()">Imprimir</button>`;
