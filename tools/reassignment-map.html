@@ -156,7 +156,9 @@
       box-shadow: 0 1px 2px rgba(20, 28, 33, .08);
     }
     .contract-head {
-      min-height: 37px;
+      display: grid;
+      gap: 2px;
+      min-height: 49px;
       border-bottom: 1px solid var(--line);
       padding: 9px 11px;
       color: #4e5960;
@@ -164,6 +166,13 @@
       font-weight: 800;
       text-align: center;
       text-transform: uppercase;
+    }
+    .contract-client {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1.2;
+      text-transform: none;
     }
     .contract-items { display: flex; gap: 9px; align-items: stretch; padding: 9px; }
     .sale-item {
@@ -442,7 +451,12 @@
           <div class="contracts">
             ${groups.map(({ contract, items: contractItems }) => `
               <section class="contract">
-                <div class="contract-head">${escapeHtml(contract.label)}</div>
+                <div class="contract-head">
+                  <span>${escapeHtml(contract.label)}</span>
+                  ${contract.client?.label
+                    ? `<small class="contract-client">${escapeHtml(contract.client.label)}</small>`
+                    : ""}
+                </div>
                 <div class="contract-items">
                   ${contractItems.map((item) =>
                     itemHtml(item, state, assignments, deliveryIds, changedIds)
