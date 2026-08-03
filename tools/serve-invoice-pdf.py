@@ -540,6 +540,9 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
 
 
 def monthly_close_number(value) -> float | None:
+    formula_error = monthly_close_formula_error(value)
+    if formula_error:
+        raise ValueError(f"Airtable formula error: {formula_error}")
     if value is None or value == "":
         return None
     if isinstance(value, bool):
@@ -555,6 +558,37 @@ def monthly_close_number(value) -> float | None:
         return float(text)
     except ValueError as exc:
         raise ValueError(f"Invalid monthly close number: {value!r}") from exc
+
+
+def monthly_close_formula_error(value: object) -> str | None:
+    if isinstance(value, dict):
+        marker = value.get("error") or value.get("specialValue")
+        if marker:
+            return str(marker)
+        for nested in value.values():
+            problem = monthly_close_formula_error(nested)
+            if problem:
+                return problem
+        return None
+    if isinstance(value, list):
+        for nested in value:
+            problem = monthly_close_formula_error(nested)
+            if problem:
+                return problem
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("{") or text.startswith("["):
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                parsed = None
+            if parsed is not None:
+                return monthly_close_formula_error(parsed)
+        match = re.search(r"#(?:ERROR|DIV/0|VALUE|REF|NAME|N/A|NUM|NULL)!?", text, re.I)
+        if match:
+            return match.group(0)
+    return None
 
 
 def monthly_close_sheet_name(value: object, index: int, used: set[str]) -> str:
@@ -683,7 +717,21 @@ def render_monthly_close_xlsx_bytes(payload: dict) -> tuple[bytes, str, dict]:
             excel_row = data_start_row + row_offset
             for col, field_name in enumerate(MONTHLY_CLOSE_FIELDS, start=1):
                 raw_value = fields.get(field_name)
-                value = monthly_close_number(raw_value) if field_name in MONTHLY_CLOSE_NUMERIC_FIELDS else raw_value
+                try:
+                    value = (
+                        monthly_close_number(raw_value)
+                        if field_name in MONTHLY_CLOSE_NUMERIC_FIELDS
+                        else raw_value
+                    )
+                except ValueError as exc:
+                    existence_name = str(
+                        fields.get("ID Fábrica")
+                        or item.get("recordId")
+                        or f"Existencia {row_offset + 1}"
+                    ).strip()
+                    raise ValueError(
+                        f"{packing_list_name} / {existence_name} / {field_name}: {exc}"
+                    ) from exc
                 cell = ws.cell(row=excel_row, column=col, value=value)
                 cell.font = body_font
                 cell.alignment = Alignment(
@@ -926,7 +974,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.2"
+    server_version = "STAInvoicePDF/0.3"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
@@ -944,6 +992,7 @@ class Handler(BaseHTTPRequestHandler):
                 HTTPStatus.OK,
                 {
                     "ok": True,
+                    "serviceVersion": self.server_version,
                     "baseId": config["base_id"],
                     "hasAirtableToken": bool(config["airtable_token"]),
                     "hasAttachmentField": bool(config["attachment_field_id"]),
