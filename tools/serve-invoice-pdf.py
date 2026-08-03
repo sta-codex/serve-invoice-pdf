@@ -1,10 +1,15 @@
 #!/usr/bin/env python
-"""Small HTTP service for generating STA invoice documents.
+"""Small HTTP service for generating STA invoice and monthly-close documents.
 
 Typical Airtable automation flow:
 1. Airtable sends the invoice payload to POST /airtable/invoices/render.
 2. This service renders a PDF and, for grouped invoices, a detail XLSX workbook.
 3. Airtable receives temporary public URLs and attaches them to Documento.
+
+Monthly-close flow:
+1. Airtable sends contable existences to POST /airtable/monthly-close/render.
+2. This service renders a summary plus one XLSX sheet per Packing List.
+3. Airtable attaches the temporary URL to Packing Lists.Cierre copias.
 """
 
 from __future__ import annotations
@@ -13,10 +18,12 @@ import base64
 import importlib.util
 import json
 import os
+import re
 import secrets
 import sys
 import tempfile
 import time
+from datetime import date
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
@@ -51,6 +58,38 @@ def load_renderer():
 
 RENDERER = load_renderer()
 RENDERER.load_dotenv()
+
+MONTHLY_CLOSE_FIELDS = (
+    "ID Fábrica",
+    "Neto",
+    "Bruto",
+    "Carta de crédito valor",
+    "Material valor [€]",
+    "Inspección valor",
+    "Inspección origen valor",
+    "Seguro valor",
+    "Flete valor",
+    "Comisiones de compra valor",
+    "CBAM valor",
+    "Desestiba valor",
+    "T3 Valor",
+    "Clasificación valor",
+    "Entoldado valor",
+    "Abono agencia valor",
+    "DVD valor",
+    "Despacho valor",
+    "Plásticos valor",
+    "Cuota valor",
+    "Movimientos de compra base valor",
+    "Movimientos de compra descarga valor",
+    "Almacenajes valor",
+    "Valor total",
+    "Precio total",
+)
+MONTHLY_CLOSE_WEIGHT_FIELDS = {"Neto", "Bruto"}
+MONTHLY_CLOSE_PRICE_FIELDS = {"Precio total"}
+MONTHLY_CLOSE_NUMERIC_FIELDS = set(MONTHLY_CLOSE_FIELDS[1:])
+MONTHLY_CLOSE_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -500,6 +539,336 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     return output.getvalue(), filename
 
 
+def monthly_close_number(value) -> float | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace(" ", "")
+    if not text:
+        return None
+    if "," in text:
+        text = text.replace(".", "").replace(",", ".")
+    try:
+        return float(text)
+    except ValueError as exc:
+        raise ValueError(f"Invalid monthly close number: {value!r}") from exc
+
+
+def monthly_close_sheet_name(value: object, index: int, used: set[str]) -> str:
+    cleaned = re.sub(r"[\\/*?:\[\]]", " ", str(value or "Packing List"))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip() or "Packing List"
+    prefix = f"{index:02d} "
+    candidate = f"{prefix}{cleaned}"[:31].rstrip()
+    suffix = 2
+    while candidate.casefold() in used:
+        marker = f" ({suffix})"
+        candidate = f"{prefix}{cleaned}"[: 31 - len(marker)].rstrip() + marker
+        suffix += 1
+    used.add(candidate.casefold())
+    return candidate
+
+
+def monthly_close_formula_sheet_name(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def monthly_close_number_format(field_name: str) -> str:
+    if field_name in MONTHLY_CLOSE_WEIGHT_FIELDS:
+        return "#,##0.000"
+    if field_name in MONTHLY_CLOSE_PRICE_FIELDS:
+        return '#,##0.00 "€/MT"'
+    if field_name in MONTHLY_CLOSE_NUMERIC_FIELDS:
+        return '#,##0.00 "€"'
+    return "General"
+
+
+def style_monthly_close_header(ws, row: int, col_count: int) -> None:
+    fill = PatternFill("solid", fgColor="7A0019")
+    side = Side(style="thin", color="630014")
+    border = Border(bottom=side)
+    font = Font(name="Arial", size=9, bold=True, color="FFFFFF")
+    for col in range(1, col_count + 1):
+        cell = ws.cell(row=row, column=col)
+        cell.fill = fill
+        cell.font = font
+        cell.border = border
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.row_dimensions[row].height = 34
+
+
+def style_monthly_close_total(ws, row: int, col_count: int) -> None:
+    fill = PatternFill("solid", fgColor="EAD5DB")
+    side = Side(style="medium", color="7A0019")
+    font = Font(name="Arial", size=9, bold=True, color="4D0919")
+    for col in range(1, col_count + 1):
+        cell = ws.cell(row=row, column=col)
+        cell.fill = fill
+        cell.font = font
+        cell.border = Border(top=side)
+        cell.alignment = Alignment(horizontal="right" if col > 1 else "left", vertical="center")
+    ws.row_dimensions[row].height = 20
+
+
+def render_monthly_close_xlsx_bytes(payload: dict) -> tuple[bytes, str, dict]:
+    close_date = str(payload.get("closeDate") or "").strip()
+    try:
+        date.fromisoformat(close_date)
+    except ValueError as exc:
+        raise ValueError("closeDate must be a valid ISO date (YYYY-MM-DD).") from exc
+
+    packing_lists = payload.get("packingLists")
+    if not isinstance(packing_lists, list) or not packing_lists:
+        raise ValueError("packingLists must contain at least one Packing List.")
+    if len(packing_lists) > 250:
+        raise ValueError("Monthly close is limited to 250 Packing Lists per workbook.")
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    wb.calculation.fullCalcOnLoad = True
+    wb.calculation.forceFullCalc = True
+    wb.calculation.calcMode = "auto"
+
+    used_sheet_names = {"resumen"}
+    detail_sheets: list[dict] = []
+    total_existences = 0
+    title_font = Font(name="Arial", size=15, bold=True, color="7A0019")
+    subtitle_font = Font(name="Arial", size=10, color="595959")
+    body_font = Font(name="Arial", size=9, color="202020")
+    alternate_fill = PatternFill("solid", fgColor="F8F2F4")
+    thin_bottom = Side(style="thin", color="E3D7DB")
+
+    for index, packing_list in enumerate(packing_lists, start=1):
+        if not isinstance(packing_list, dict):
+            raise ValueError(f"Packing List {index} must be an object.")
+        packing_list_name = str(
+            packing_list.get("name") or packing_list.get("recordId") or f"Packing List {index}"
+        ).strip()
+        rows = packing_list.get("existencias")
+        if not isinstance(rows, list) or not rows:
+            raise ValueError(f"Packing List {packing_list_name} has no existencias.")
+        total_existences += len(rows)
+
+        sheet_name = monthly_close_sheet_name(packing_list_name, index, used_sheet_names)
+        ws = wb.create_sheet(sheet_name)
+        col_count = len(MONTHLY_CLOSE_FIELDS)
+        last_col = get_column_letter(col_count)
+
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=col_count)
+        ws.cell(row=1, column=1, value=f"Cierre mensual · {packing_list_name}")
+        ws.cell(row=1, column=1).font = title_font
+        ws.cell(row=1, column=1).alignment = Alignment(horizontal="left", vertical="center")
+        ws.row_dimensions[1].height = 26
+        ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=col_count)
+        ws.cell(row=2, column=1, value=f"Fecha de cierre: {close_date}")
+        ws.cell(row=2, column=1).font = subtitle_font
+        ws.row_dimensions[2].height = 18
+
+        header_row = 4
+        data_start_row = 5
+        for col, field_name in enumerate(MONTHLY_CLOSE_FIELDS, start=1):
+            ws.cell(row=header_row, column=col, value=field_name)
+        style_monthly_close_header(ws, header_row, col_count)
+
+        for row_offset, item in enumerate(rows):
+            if not isinstance(item, dict):
+                raise ValueError(f"Existencia {row_offset + 1} in {packing_list_name} must be an object.")
+            fields = item.get("fields")
+            if not isinstance(fields, dict):
+                raise ValueError(
+                    f"Existencia {row_offset + 1} in {packing_list_name} is missing fields."
+                )
+            excel_row = data_start_row + row_offset
+            for col, field_name in enumerate(MONTHLY_CLOSE_FIELDS, start=1):
+                raw_value = fields.get(field_name)
+                value = monthly_close_number(raw_value) if field_name in MONTHLY_CLOSE_NUMERIC_FIELDS else raw_value
+                cell = ws.cell(row=excel_row, column=col, value=value)
+                cell.font = body_font
+                cell.alignment = Alignment(
+                    horizontal="right" if field_name in MONTHLY_CLOSE_NUMERIC_FIELDS else "left",
+                    vertical="center",
+                )
+                if field_name in MONTHLY_CLOSE_NUMERIC_FIELDS:
+                    cell.number_format = monthly_close_number_format(field_name)
+                cell.border = Border(bottom=thin_bottom)
+                if row_offset % 2:
+                    cell.fill = alternate_fill
+            ws.row_dimensions[excel_row].height = 18
+
+        data_end_row = data_start_row + len(rows) - 1
+        total_row = data_end_row + 1
+        ws.cell(row=total_row, column=1, value="TOTAL")
+        value_total_col = MONTHLY_CLOSE_FIELDS.index("Valor total") + 1
+        net_col = MONTHLY_CLOSE_FIELDS.index("Neto") + 1
+        for col, field_name in enumerate(MONTHLY_CLOSE_FIELDS[1:], start=2):
+            col_letter = get_column_letter(col)
+            if field_name == "Precio total":
+                value_letter = get_column_letter(value_total_col)
+                net_letter = get_column_letter(net_col)
+                formula = f"=IFERROR({value_letter}{total_row}/{net_letter}{total_row},0)"
+            else:
+                formula = f"=SUM({col_letter}{data_start_row}:{col_letter}{data_end_row})"
+            ws.cell(row=total_row, column=col, value=formula)
+            ws.cell(row=total_row, column=col).number_format = monthly_close_number_format(field_name)
+        style_monthly_close_total(ws, total_row, col_count)
+
+        ws.auto_filter.ref = f"A{header_row}:{last_col}{data_end_row}"
+        ws.freeze_panes = f"A{data_start_row}"
+        ws.sheet_view.showGridLines = False
+        ws.sheet_view.zoomScale = 75
+        ws.print_title_rows = f"1:{header_row}"
+        ws.print_area = f"A1:{last_col}{total_row}"
+        ws.page_setup.orientation = "landscape"
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_margins = PageMargins(left=0.25, right=0.25, top=0.35, bottom=0.45, header=0.15, footer=0.2)
+        ws.oddFooter.center.text = f'&"Arial"&7&K777777Cierre mensual {close_date}'
+        ws.evenFooter.center.text = ws.oddFooter.center.text
+
+        for col, field_name in enumerate(MONTHLY_CLOSE_FIELDS, start=1):
+            if field_name == "ID Fábrica":
+                width = 20
+            elif field_name in MONTHLY_CLOSE_WEIGHT_FIELDS:
+                width = 13
+            elif field_name in MONTHLY_CLOSE_PRICE_FIELDS:
+                width = 16
+            elif field_name.startswith("Movimientos de compra"):
+                width = 28
+            elif len(field_name) > 24:
+                width = 23
+            else:
+                width = 18
+            ws.column_dimensions[get_column_letter(col)].width = width
+
+        detail_sheets.append(
+            {
+                "name": sheet_name,
+                "packingList": packing_list_name,
+                "totalRow": total_row,
+                "dataStartRow": data_start_row,
+                "dataEndRow": data_end_row,
+                "recordId": packing_list.get("recordId"),
+            }
+        )
+
+    summary_headers = ["Packing List", "Existencias", *MONTHLY_CLOSE_FIELDS[1:]]
+    summary = wb.create_sheet("Resumen", 0)
+    summary_col_count = len(summary_headers)
+    summary_last_col = get_column_letter(summary_col_count)
+    summary.merge_cells(start_row=1, start_column=1, end_row=1, end_column=summary_col_count)
+    summary.cell(row=1, column=1, value="Cierre mensual de existencias contables")
+    summary.cell(row=1, column=1).font = title_font
+    summary.row_dimensions[1].height = 26
+    summary.merge_cells(start_row=2, start_column=1, end_row=2, end_column=summary_col_count)
+    summary.cell(row=2, column=1, value=f"Fecha de cierre: {close_date}")
+    summary.cell(row=2, column=1).font = subtitle_font
+
+    summary_header_row = 4
+    summary_data_start = 5
+    for col, header in enumerate(summary_headers, start=1):
+        summary.cell(row=summary_header_row, column=col, value=header)
+    style_monthly_close_header(summary, summary_header_row, summary_col_count)
+
+    for row_offset, detail in enumerate(detail_sheets):
+        row = summary_data_start + row_offset
+        quoted_sheet = monthly_close_formula_sheet_name(detail["name"])
+        summary.cell(row=row, column=1, value=detail["packingList"])
+        summary.cell(row=row, column=1).hyperlink = f"#{quoted_sheet}!A1"
+        summary.cell(row=row, column=1).style = "Hyperlink"
+        summary.cell(
+            row=row,
+            column=2,
+            value=f"=ROWS({quoted_sheet}!A{detail['dataStartRow']}:A{detail['dataEndRow']})",
+        )
+        for detail_col, field_name in enumerate(MONTHLY_CLOSE_FIELDS[1:], start=2):
+            summary_col = detail_col + 1
+            if field_name == "Precio total":
+                value_summary_col = 2 + MONTHLY_CLOSE_FIELDS.index("Valor total")
+                net_summary_col = 2 + MONTHLY_CLOSE_FIELDS.index("Neto")
+                formula = (
+                    f"=IFERROR({get_column_letter(value_summary_col)}{row}/"
+                    f"{get_column_letter(net_summary_col)}{row},0)"
+                )
+            else:
+                formula = f"={quoted_sheet}!{get_column_letter(detail_col)}{detail['totalRow']}"
+            cell = summary.cell(row=row, column=summary_col, value=formula)
+            cell.number_format = monthly_close_number_format(field_name)
+        for col in range(1, summary_col_count + 1):
+            cell = summary.cell(row=row, column=col)
+            cell.font = body_font
+            cell.alignment = Alignment(horizontal="right" if col > 1 else "left", vertical="center")
+            cell.border = Border(bottom=thin_bottom)
+            if row_offset % 2:
+                cell.fill = alternate_fill
+        summary.row_dimensions[row].height = 18
+
+    summary_data_end = summary_data_start + len(detail_sheets) - 1
+    summary_total_row = summary_data_end + 1
+    summary.cell(row=summary_total_row, column=1, value="TOTAL GENERAL")
+    for col in range(2, summary_col_count + 1):
+        field_name = summary_headers[col - 1]
+        col_letter = get_column_letter(col)
+        if field_name == "Precio total":
+            value_col = summary_headers.index("Valor total") + 1
+            net_col_summary = summary_headers.index("Neto") + 1
+            formula = (
+                f"=IFERROR({get_column_letter(value_col)}{summary_total_row}/"
+                f"{get_column_letter(net_col_summary)}{summary_total_row},0)"
+            )
+        else:
+            formula = f"=SUM({col_letter}{summary_data_start}:{col_letter}{summary_data_end})"
+        summary.cell(row=summary_total_row, column=col, value=formula)
+        if field_name in MONTHLY_CLOSE_NUMERIC_FIELDS:
+            summary.cell(row=summary_total_row, column=col).number_format = monthly_close_number_format(field_name)
+        elif field_name == "Existencias":
+            summary.cell(row=summary_total_row, column=col).number_format = "#,##0"
+    style_monthly_close_total(summary, summary_total_row, summary_col_count)
+
+    summary.auto_filter.ref = f"A{summary_header_row}:{summary_last_col}{summary_data_end}"
+    summary.freeze_panes = f"A{summary_data_start}"
+    summary.sheet_view.showGridLines = False
+    summary.sheet_view.zoomScale = 75
+    summary.print_title_rows = f"1:{summary_header_row}"
+    summary.print_area = f"A1:{summary_last_col}{summary_total_row}"
+    summary.page_setup.orientation = "landscape"
+    summary.page_setup.fitToWidth = 1
+    summary.page_setup.fitToHeight = 0
+    summary.sheet_properties.pageSetUpPr.fitToPage = True
+    summary.page_margins = PageMargins(left=0.25, right=0.25, top=0.35, bottom=0.45, header=0.15, footer=0.2)
+    summary.oddFooter.center.text = f'&"Arial"&7&K777777Cierre mensual {close_date}'
+    summary.evenFooter.center.text = summary.oddFooter.center.text
+    for col, field_name in enumerate(summary_headers, start=1):
+        if field_name == "Packing List":
+            width = 24
+        elif field_name == "Existencias":
+            width = 12
+        elif field_name in MONTHLY_CLOSE_WEIGHT_FIELDS:
+            width = 13
+        elif field_name in MONTHLY_CLOSE_PRICE_FIELDS:
+            width = 16
+        elif field_name.startswith("Movimientos de compra"):
+            width = 28
+        elif len(field_name) > 24:
+            width = 23
+        else:
+            width = 18
+        summary.column_dimensions[get_column_letter(col)].width = width
+
+    output = BytesIO()
+    wb.save(output)
+    filename = f"cierre-mensual-{close_date}.xlsx"
+    metadata = {
+        "closeDate": close_date,
+        "packingLists": len(detail_sheets),
+        "existencias": total_existences,
+        "sheets": ["Resumen", *[item["name"] for item in detail_sheets]],
+    }
+    return output.getvalue(), filename, metadata
+
+
 def clean_file_cache(config: dict) -> None:
     now = time.time()
     ttl = int(config["cache_ttl_seconds"])
@@ -557,7 +926,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.1"
+    server_version = "STAInvoicePDF/0.2"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
@@ -580,6 +949,7 @@ class Handler(BaseHTTPRequestHandler):
                     "hasAttachmentField": bool(config["attachment_field_id"]),
                     "publicBaseUrl": config["public_base_url"],
                     "cacheTtlSeconds": config["cache_ttl_seconds"],
+                    "monthlyCloseEndpoint": "/airtable/monthly-close/render",
                 },
             )
             return
@@ -631,7 +1001,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - stdlib API
         config = service_config()
         parsed = urlparse(self.path)
-        if parsed.path not in {"/airtable/invoices/generate", "/airtable/invoices/render"}:
+        if parsed.path not in {
+            "/airtable/invoices/generate",
+            "/airtable/invoices/render",
+            "/airtable/monthly-close/render",
+        }:
             text_response(self, HTTPStatus.NOT_FOUND, "Not found")
             return
         if not is_authorized(self, config):
@@ -639,6 +1013,29 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             payload = read_json_body(self)
+            if parsed.path == "/airtable/monthly-close/render":
+                xlsx_bytes, filename, metadata = render_monthly_close_xlsx_bytes(payload)
+                key = cache_file(xlsx_bytes, filename, MONTHLY_CLOSE_CONTENT_TYPE, config)
+                attachment = {
+                    "url": f"{public_base_url(self, config)}/files/{key}",
+                    "filename": filename,
+                    "contentType": MONTHLY_CLOSE_CONTENT_TYPE,
+                    "bytes": len(xlsx_bytes),
+                }
+                json_response(
+                    self,
+                    HTTPStatus.OK,
+                    {
+                        "ok": True,
+                        "filename": filename,
+                        "bytes": len(xlsx_bytes),
+                        "fileUrl": attachment["url"],
+                        "attachments": [attachment],
+                        "metadata": metadata,
+                        "expiresInSeconds": config["cache_ttl_seconds"],
+                    },
+                )
+                return
             if parsed.path == "/airtable/invoices/render":
                 invoice = build_invoice_from_payload(payload)
             else:
@@ -728,6 +1125,7 @@ def main() -> int:
     print("GET  /invoice.pdf?invoice=2025-192")
     print("POST /airtable/invoices/generate")
     print("POST /airtable/invoices/render")
+    print("POST /airtable/monthly-close/render")
     server.serve_forever()
     return 0
 

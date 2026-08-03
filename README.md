@@ -9,6 +9,9 @@ Servicio Node para generar facturas comerciales de Steel Trade desde la tabla
 - `mode=detail`: PDF con lineas a nivel existencia.
 - Confirmaciones de pedido desde `Contratos de venta`: DOCX con tabla de mercancía insertada para adjuntar en
   `Documentos confirmación`.
+- Cierres mensuales de existencias contables: XLSX con hoja `Resumen` y una
+  hoja por Packing List, servido temporalmente para adjuntarlo en
+  `Packing Lists.Cierre copias`.
 
 ## Variables necesarias
 
@@ -38,6 +41,7 @@ Endpoints:
 ```txt
 GET /health
 GET /airtable/reassignment-map#<base64url-payload>
+POST /airtable/monthly-close/render
 GET /api/invoices/:recordId?mode=grouped
 GET /api/invoices/:recordId?mode=detail
 GET /api/invoices/by-number/:invoiceNumber?mode=grouped
