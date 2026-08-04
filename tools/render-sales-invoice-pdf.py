@@ -810,6 +810,9 @@ def group_invoice_lines(lines: list[Line]) -> list[Line]:
                 net_weight=sum(line.net_weight for line in items),
                 gross_weight=sum(line.gross_weight for line in items),
                 weight_basis=common_text([line.weight_basis for line in items], first_line.weight_basis),
+                material_heading=common_text(
+                    [line.material_heading for line in items], first_line.material_heading
+                ),
             )
         )
     return result
@@ -839,17 +842,16 @@ def infer_category(lines: list[Line], fallback: str) -> str:
     if len(headings) > 1:
         return " / ".join(headings)
 
+    if fallback:
+        return clean_text(fallback).upper()
+
     codes = list(
         dict.fromkeys(
             clean_text(line.material).upper() for line in lines if clean_text(line.material)
         )
     )
     if len(codes) == 1:
-        code = codes[0]
-        return material_heading_from_code(code)
-    if fallback:
-        fallback_code = clean_text(fallback).upper()
-        return material_heading_from_code(fallback_code)
+        return codes[0]
     return "STEEL PRODUCTS"
 
 
@@ -1039,8 +1041,7 @@ def build_invoice_from_payload(
                 net_weight=scalar_number(item.get("netWeight")),
                 gross_weight=scalar_number(item.get("grossWeight")),
                 weight_basis=scalar_text(item.get("weightBasis")),
-                material_heading=scalar_text(item.get("materialHeading"))
-                or material_heading_from_code(item.get("material")),
+                material_heading=scalar_text(item.get("materialHeading")),
             )
         )
 
