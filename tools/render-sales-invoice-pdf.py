@@ -86,6 +86,7 @@ def register_invoice_fonts() -> tuple[str, str]:
 
 
 REGULAR_FONT, BOLD_FONT = register_invoice_fonts()
+MONO_FONT = "Courier"
 
 
 FACTURA = {
@@ -646,6 +647,16 @@ def line_item_label(line: Line) -> str:
 
 def line_characteristics(line: Line) -> str:
     return " ".join(unique_texts([line.quality, line.coating, line.finish, line.color]))
+
+
+def grouped_description(line: Line) -> str:
+    columns = [
+        (normalize_thickness_in_measure(line.dimensions), 18),
+        (line_characteristics(line), 34),
+        (line.order_number, 18),
+        (line.product_code, 20),
+    ]
+    return " ".join(clean_text(value)[:width].ljust(width) for value, width in columns).rstrip()
 
 
 def clean_ship_name(value: str) -> str:
@@ -1669,8 +1680,13 @@ def draw_table_page(c: canvas.Canvas, invoice: InvoiceData, page_lines: list[Lin
     for line in page_lines:
         c.setFont(REGULAR_FONT, line_font_size)
         if invoice.mode == "grouped":
-            c.drawString(x + 42, y, fit_text(c, fmt_measure_text(line.dimensions), 78, REGULAR_FONT, line_font_size))
-            c.drawString(x + 130, y, fit_text(c, line_characteristics(line), 170, REGULAR_FONT, line_font_size))
+            grouped_font_size = 5.6
+            c.setFont(MONO_FONT, grouped_font_size)
+            c.drawString(
+                x + 5,
+                y,
+                fit_text(c, grouped_description(line), desc_w - 10, MONO_FONT, grouped_font_size),
+            )
         else:
             main_desc, packing_desc = detail_description_parts(line)
             c.setFont(REGULAR_FONT, 5.8)
