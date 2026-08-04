@@ -86,7 +86,27 @@ def register_invoice_fonts() -> tuple[str, str]:
 
 
 REGULAR_FONT, BOLD_FONT = register_invoice_fonts()
-MONO_FONT = "Courier"
+
+
+def register_invoice_mono_font() -> str:
+    windows_fonts = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
+    candidates = [
+        windows_fonts / "DejaVuSansMono.ttf",
+        windows_fonts / "consola.ttf",
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
+    ]
+    for font_path in candidates:
+        if not font_path.exists():
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont("STA-Mono", str(font_path)))
+            return "STA-Mono"
+        except Exception:
+            continue
+    return "Courier"
+
+
+MONO_FONT = register_invoice_mono_font()
 
 
 FACTURA = {
@@ -1680,7 +1700,8 @@ def draw_table_page(c: canvas.Canvas, invoice: InvoiceData, page_lines: list[Lin
     for line in page_lines:
         c.setFont(REGULAR_FONT, line_font_size)
         if invoice.mode == "grouped":
-            grouped_font_size = 5.6
+            has_customer_codes = bool(clean_text(line.order_number) or clean_text(line.product_code))
+            grouped_font_size = 5.6 if has_customer_codes else 6.4
             c.setFont(MONO_FONT, grouped_font_size)
             c.drawString(
                 x + 5,
