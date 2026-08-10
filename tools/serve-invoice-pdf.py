@@ -974,7 +974,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.3"
+    server_version = "STAInvoicePDF/0.3.1"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
