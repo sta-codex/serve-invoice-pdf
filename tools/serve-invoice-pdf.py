@@ -332,14 +332,12 @@ def detail_groups(lines: list) -> list[tuple[object, list]]:
     return [(RENDERER.group_invoice_lines(items)[0], items) for items in grouped.values()]
 
 
+def xlsx_has_value(value) -> bool:
+    return value is not None and (not isinstance(value, str) or bool(value.strip()))
+
+
 def xlsx_alignment_for_col(col: int, weight_start_col: int, row_kind: str) -> Alignment:
-    if row_kind == "header":
-        return Alignment(vertical="center", horizontal="center", wrap_text=False)
-    if col >= weight_start_col:
-        return Alignment(vertical="center", horizontal="right", wrap_text=False)
-    if col in {1, 2, 3, 5, 6, 7, 12}:
-        return Alignment(vertical="center", horizontal="center", wrap_text=False)
-    return Alignment(vertical="center", horizontal="left", wrap_text=False)
+    return Alignment(vertical="center", horizontal="center", wrap_text=False)
 
 
 def style_row(
@@ -388,13 +386,33 @@ def add_sta_logo(ws) -> BytesIO:
 
 def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     weight_mode = RENDERER.normalise_weight_mode(invoice.weight_mode) or "gross"
-    headers = detail_headers(invoice, weight_mode)
+    all_headers = detail_headers(invoice, weight_mode)
+    all_widths = [8, 5, 6, 9.5, 7.5, 8, 8, 11, 12, 13, 15, 18, 11.5, 11.5]
+    detail_lines = invoice.detail_lines or invoice.lines
+    groups = detail_groups(detail_lines)
+    column_has_data = [False] * len(all_headers)
+    for group_line, items in groups:
+        value_rows = [line_group_values(group_line, weight_mode, invoice)]
+        item_label = group_line.item_label or group_line.factory_id
+        value_rows.extend(
+            line_detail_values(line, weight_mode, invoice, item_label, detail_index)
+            for detail_index, line in enumerate(items, start=1)
+        )
+        for values in value_rows:
+            for index, value in enumerate(values):
+                column_has_data[index] = column_has_data[index] or xlsx_has_value(value)
+    active_columns = [index for index, has_data in enumerate(column_has_data) if has_data]
+    headers = [all_headers[index] for index in active_columns]
+    widths = [all_widths[index] for index in active_columns]
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Detalle"
     col_count = len(headers)
-    weight_start_col = col_count - 1 if weight_mode == "net" else col_count
+    header_col_count = max(14, col_count)
+    weight_start_col = next(
+        index for index, header in enumerate(headers, start=1) if header in {"Neto", "Bruto"}
+    )
 
     header_fill = PatternFill("solid", fgColor="FF7A0019")
     total_fill = PatternFill("solid", fgColor="FFA43052")
@@ -427,19 +445,19 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     set_merged_value(ws, 4, 5, 9, "28004 Madrid, Espa\u00f1a", small_font, top_alignment)
     set_merged_value(ws, 5, 5, 9, "+34 91 068 82 77", small_font, top_alignment)
     set_merged_value(ws, 6, 5, 9, "CIF: B88047790", small_font, top_alignment)
-    customer_col = min(10, col_count)
+    customer_col = 10
     for offset, line in enumerate(invoice.customer_lines[:5], start=2):
         font = bold if offset == 2 else small_font
-        set_merged_value(ws, offset, customer_col, col_count, line, font, top_alignment)
+        set_merged_value(ws, offset, customer_col, header_col_count, line, font, top_alignment)
 
     description = f"Commercial Invoice Detail Number: {invoice.invoice_id}"
     ws.cell(row=8, column=3, value=description)
-    ws.merge_cells(start_row=8, start_column=3, end_row=8, end_column=max(3, col_count - 1))
-    ws.cell(row=8, column=col_count, value=invoice.date_text)
+    ws.merge_cells(start_row=8, start_column=3, end_row=8, end_column=header_col_count - 1)
+    ws.cell(row=8, column=header_col_count, value=invoice.date_text)
     ws.cell(row=8, column=3).font = Font(name="Arial", size=8, bold=True)
     ws.cell(row=8, column=3).alignment = Alignment(vertical="center", horizontal="left", shrink_to_fit=True)
-    ws.cell(row=8, column=col_count).font = Font(name="Arial", size=8)
-    ws.cell(row=8, column=col_count).alignment = Alignment(vertical="center", horizontal="right")
+    ws.cell(row=8, column=header_col_count).font = Font(name="Arial", size=8)
+    ws.cell(row=8, column=header_col_count).alignment = Alignment(vertical="center", horizontal="right")
     ws.row_dimensions[7].height = 7
     ws.row_dimensions[8].height = 18
     ws.row_dimensions[9].height = 7
@@ -459,8 +477,6 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         row_kind="header",
     )
 
-    detail_lines = invoice.detail_lines or invoice.lines
-    groups = detail_groups(detail_lines)
     total_net = sum(line_net_weight(group_line, weight_mode) for group_line, _ in groups)
     total_gross = sum(line_gross_weight(group_line, weight_mode) for group_line, _ in groups)
     total_row = header_row + 1
@@ -484,8 +500,9 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     row = total_row + 1
     for group_line, items in groups:
         item_label = group_line.item_label or group_line.factory_id
-        for col, value in enumerate(line_group_values(group_line, weight_mode, invoice), start=1):
-            ws.cell(row=row, column=col, value=value)
+        group_values = line_group_values(group_line, weight_mode, invoice)
+        for col, source_index in enumerate(active_columns, start=1):
+            ws.cell(row=row, column=col, value=group_values[source_index])
         ws.row_dimensions[row].height = 18
         style_row(
             ws,
@@ -498,10 +515,9 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         )
         row += 1
         for detail_index, line in enumerate(items, start=1):
-            for col, value in enumerate(
-                line_detail_values(line, weight_mode, invoice, item_label, detail_index), start=1
-            ):
-                ws.cell(row=row, column=col, value=value)
+            detail_values = line_detail_values(line, weight_mode, invoice, item_label, detail_index)
+            for col, source_index in enumerate(active_columns, start=1):
+                ws.cell(row=row, column=col, value=detail_values[source_index])
             ws.row_dimensions[row].height = 17
             style_row(
                 ws,
@@ -514,14 +530,16 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
             row += 1
 
     last_row = max(total_row, row - 1)
-    last_col_letter = get_column_letter(col_count)
-    ws.auto_filter.ref = f"C{header_row}:{last_col_letter}{last_row}"
+    table_last_col_letter = get_column_letter(col_count)
+    print_last_col_letter = get_column_letter(header_col_count)
+    ws.auto_filter.ref = f"C{header_row}:{table_last_col_letter}{last_row}"
     ws.print_title_rows = f"{header_row}:{header_row}"
-    ws.print_area = f"C2:{last_col_letter}{last_row}"
+    ws.print_area = f"C2:{print_last_col_letter}{last_row}"
 
-    widths = [8, 5, 6, 9.5, 7.5, 8, 8, 11, 12, 13, 15, 18, 11.5, 11.5]
-    for index, width in enumerate(widths[:col_count], start=1):
+    for index, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(index)].width = width
+    for index in range(col_count + 1, header_col_count + 1):
+        ws.column_dimensions[get_column_letter(index)].width = all_widths[index - 1]
     ws.column_dimensions["A"].hidden = True
     ws.column_dimensions["B"].hidden = True
     for row_cells in ws.iter_rows(min_row=total_row, max_row=last_row):
@@ -983,7 +1001,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.3.4"
+    server_version = "STAInvoicePDF/0.3.5"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
