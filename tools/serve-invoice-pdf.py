@@ -39,11 +39,13 @@ FILE_CACHE: dict[str, dict] = {}
 
 try:
     from openpyxl import Workbook
+    from openpyxl.drawing.image import Image as XLImage
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
     from openpyxl.worksheet.page import PageMargins
+    from PIL import Image as PILImage, ImageDraw
 except ImportError as exc:  # pragma: no cover - environment guard
-    raise SystemExit("Missing openpyxl. Install it with: python -m pip install openpyxl") from exc
+    raise SystemExit("Missing openpyxl/Pillow. Install them with: python -m pip install openpyxl pillow") from exc
 
 
 def load_renderer():
@@ -371,6 +373,22 @@ def set_merged_value(ws, row: int, start_col: int, end_col: int, value: str, fon
         cell.alignment = alignment
 
 
+def add_sta_logo(ws) -> BytesIO:
+    logo_stream = BytesIO()
+    image = PILImage.new("RGBA", (180, 108), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(image)
+    for index, color in enumerate(("#BE737E", "#A43052", "#741C35", "#4D0919")):
+        top = index * 27
+        draw.rectangle((0, top, 180, top + 20), fill=color)
+    image.save(logo_stream, format="PNG")
+    logo_stream.seek(0)
+    logo = XLImage(logo_stream)
+    logo.width = 90
+    logo.height = 54
+    ws.add_image(logo, "C2")
+    return logo_stream
+
+
 def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     weight_mode = RENDERER.normalise_weight_mode(invoice.weight_mode) or "gross"
     headers = detail_headers(invoice, weight_mode)
@@ -414,6 +432,7 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     for row, fill in zip(range(2, 6), logo_fills):
         ws.merge_cells(start_row=row, start_column=3, end_row=row, end_column=4)
         ws.cell(row=row, column=3).fill = fill
+    logo_stream = add_sta_logo(ws)
     set_merged_value(ws, 2, 5, 9, "Steel Trade Advisors, S.L.U.", title_font, top_alignment)
     set_merged_value(ws, 3, 5, 9, "C/ Almirante, n\u00ba 22, 5A", small_font, top_alignment)
     set_merged_value(ws, 4, 5, 9, "28004 Madrid, Espa\u00f1a", small_font, top_alignment)
@@ -535,6 +554,7 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
 
     output = BytesIO()
     wb.save(output)
+    logo_stream.close()
     filename = f"{RENDERER.safe_filename(invoice.invoice_id)}-detalle-existencias.xlsx"
     return output.getvalue(), filename
 
@@ -974,7 +994,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.3.1"
+    server_version = "STAInvoicePDF/0.3.2"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
