@@ -340,6 +340,12 @@ def xlsx_alignment_for_col(col: int, weight_start_col: int, row_kind: str) -> Al
     return Alignment(vertical="center", horizontal="center", wrap_text=False)
 
 
+def xlsx_sheet_col(logical_col: int, visible_start_col: int) -> int:
+    if logical_col <= 2:
+        return logical_col
+    return visible_start_col + logical_col - 3
+
+
 def style_row(
     ws,
     row: int,
@@ -350,9 +356,10 @@ def style_row(
     font=None,
     border=None,
     row_kind: str = "body",
+    visible_start_col: int = 3,
 ) -> None:
     for col in range(1, col_count + 1):
-        cell = ws.cell(row=row, column=col)
+        cell = ws.cell(row=row, column=xlsx_sheet_col(col, visible_start_col))
         if fill:
             cell.fill = fill
         if font:
@@ -404,6 +411,10 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     active_columns = [index for index, has_data in enumerate(column_has_data) if has_data]
     headers = [all_headers[index] for index in active_columns]
     widths = [all_widths[index] for index in active_columns]
+    visible_col_count = len(headers) - 2
+    available_visible_cols = 12
+    left_spacer_cols = max(0, (available_visible_cols - visible_col_count) // 2)
+    visible_start_col = 3 + left_spacer_cols
 
     wb = Workbook()
     ws = wb.active
@@ -413,6 +424,7 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     weight_start_col = next(
         index for index, header in enumerate(headers, start=1) if header in {"Neto", "Bruto"}
     )
+    weight_start_sheet_col = xlsx_sheet_col(weight_start_col, visible_start_col)
 
     header_fill = PatternFill("solid", fgColor="FF7A0019")
     total_fill = PatternFill("solid", fgColor="FFA43052")
@@ -464,7 +476,7 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
 
     header_row = 10
     for index, header in enumerate(headers, start=1):
-        ws.cell(row=header_row, column=index, value=header)
+        ws.cell(row=header_row, column=xlsx_sheet_col(index, visible_start_col), value=header)
     ws.row_dimensions[header_row].height = 18
     style_row(
         ws,
@@ -475,17 +487,30 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         font=white_bold,
         border=header_border,
         row_kind="header",
+        visible_start_col=visible_start_col,
     )
 
     total_net = sum(line_net_weight(group_line, weight_mode) for group_line, _ in groups)
     total_gross = sum(line_gross_weight(group_line, weight_mode) for group_line, _ in groups)
     total_row = header_row + 1
-    ws.cell(row=total_row, column=3, value="TOTAL")
+    ws.cell(row=total_row, column=visible_start_col, value="TOTAL")
     if weight_mode == "net":
-        ws.cell(row=total_row, column=col_count - 1, value=total_net)
-        ws.cell(row=total_row, column=col_count, value=total_gross)
+        ws.cell(
+            row=total_row,
+            column=xlsx_sheet_col(col_count - 1, visible_start_col),
+            value=total_net,
+        )
+        ws.cell(
+            row=total_row,
+            column=xlsx_sheet_col(col_count, visible_start_col),
+            value=total_gross,
+        )
     else:
-        ws.cell(row=total_row, column=col_count, value=total_gross)
+        ws.cell(
+            row=total_row,
+            column=xlsx_sheet_col(col_count, visible_start_col),
+            value=total_gross,
+        )
     ws.row_dimensions[total_row].height = 18
     style_row(
         ws,
@@ -495,6 +520,7 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         fill=total_fill,
         font=total_font,
         border=border,
+        visible_start_col=visible_start_col,
     )
 
     row = total_row + 1
@@ -502,7 +528,11 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         item_label = group_line.item_label or group_line.factory_id
         group_values = line_group_values(group_line, weight_mode, invoice)
         for col, source_index in enumerate(active_columns, start=1):
-            ws.cell(row=row, column=col, value=group_values[source_index])
+            ws.cell(
+                row=row,
+                column=xlsx_sheet_col(col, visible_start_col),
+                value=group_values[source_index],
+            )
         ws.row_dimensions[row].height = 18
         style_row(
             ws,
@@ -512,12 +542,17 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
             fill=group_fill,
             font=bold,
             border=border,
+            visible_start_col=visible_start_col,
         )
         row += 1
         for detail_index, line in enumerate(items, start=1):
             detail_values = line_detail_values(line, weight_mode, invoice, item_label, detail_index)
             for col, source_index in enumerate(active_columns, start=1):
-                ws.cell(row=row, column=col, value=detail_values[source_index])
+                ws.cell(
+                    row=row,
+                    column=xlsx_sheet_col(col, visible_start_col),
+                    value=detail_values[source_index],
+                )
             ws.row_dimensions[row].height = 17
             style_row(
                 ws,
@@ -526,27 +561,38 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
                 weight_start_col=weight_start_col,
                 font=body_font,
                 border=border,
+                visible_start_col=visible_start_col,
             )
             row += 1
 
     last_row = max(total_row, row - 1)
-    table_last_col_letter = get_column_letter(col_count)
+    table_last_col = xlsx_sheet_col(col_count, visible_start_col)
+    table_last_col_letter = get_column_letter(table_last_col)
     print_last_col_letter = get_column_letter(header_col_count)
-    ws.auto_filter.ref = f"C{header_row}:{table_last_col_letter}{last_row}"
+    table_start_col_letter = get_column_letter(visible_start_col)
+    ws.auto_filter.ref = f"{table_start_col_letter}{header_row}:{table_last_col_letter}{last_row}"
     ws.print_title_rows = f"{header_row}:{header_row}"
     ws.print_area = f"C2:{print_last_col_letter}{last_row}"
 
-    for index, width in enumerate(widths, start=1):
+    for index, width in enumerate(widths[:2], start=1):
         ws.column_dimensions[get_column_letter(index)].width = width
-    for index in range(col_count + 1, header_col_count + 1):
-        ws.column_dimensions[get_column_letter(index)].width = all_widths[index - 1]
+    available_width = sum(all_widths[2:header_col_count])
+    table_width = sum(widths[2:])
+    side_width = max(0, available_width - table_width) / 2
+    right_spacer_cols = header_col_count - table_last_col
+    for index in range(3, visible_start_col):
+        ws.column_dimensions[get_column_letter(index)].width = side_width / left_spacer_cols
+    for offset, width in enumerate(widths[2:]):
+        ws.column_dimensions[get_column_letter(visible_start_col + offset)].width = width
+    for index in range(table_last_col + 1, header_col_count + 1):
+        ws.column_dimensions[get_column_letter(index)].width = side_width / right_spacer_cols
     ws.column_dimensions["A"].hidden = True
     ws.column_dimensions["B"].hidden = True
     for row_cells in ws.iter_rows(min_row=total_row, max_row=last_row):
         for cell in row_cells:
             if isinstance(cell.value, (int, float)):
-                cell.number_format = "0.000" if cell.column >= weight_start_col else "0"
-    ws.freeze_panes = "C12"
+                cell.number_format = "0.000" if cell.column >= weight_start_sheet_col else "0"
+    ws.freeze_panes = f"{get_column_letter(visible_start_col)}12"
     ws.sheet_view.showGridLines = False
     registry_footer = f'&"Arial"&6&K888888{RENDERER.REGISTRY_LINE}'
     ws.oddFooter.center.text = registry_footer
@@ -1001,7 +1047,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.3.5"
+    server_version = "STAInvoicePDF/0.3.6"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
