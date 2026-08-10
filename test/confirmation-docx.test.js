@@ -258,7 +258,7 @@ test("replaces merchandise header and origin line", async () => {
   assert.match(text, /CONDICIONES DE ENTREGA: DDP Llanera/);
 });
 
-test("shows order number after confirmation title when present", async () => {
+test("shows order number inside the material intro when present", async () => {
   const buffer = await renderConfirmationDocx(
     {
       ...fakeConfirmation(),
@@ -273,16 +273,21 @@ test("shows order number after confirmation title when present", async () => {
   const titleIndex = paragraphs.findIndex(
     (paragraph) => extractParagraphText(paragraph) === "CONFIRMACI\u00d3N DE PEDIDO STA-2026-030"
   );
+  const introParagraph = paragraphs.find((paragraph) =>
+    extractParagraphText(paragraph).includes("LE AGRADECEMOS SU PEDIDO")
+  );
 
   assert.ok(titleIndex >= 0);
-  assert.equal(extractParagraphText(paragraphs[titleIndex + 1]), "N\u00daMERO DE PEDIDO: PO-12345");
-  assert.equal(extractParagraphText(paragraphs[titleIndex + 2]), "");
-  assert.ok(
-    extractParagraphText(paragraphs[titleIndex + 3]).includes("LE AGRADECEMOS SU PEDIDO")
+  assert.equal(extractParagraphText(paragraphs[titleIndex + 1]), "");
+  assert.ok(introParagraph);
+  assert.match(
+    extractParagraphText(introParagraph),
+    /LE AGRADECEMOS SU PEDIDO con n\u00famero: PO-12345 Y LE CONFIRMAMOS/
   );
+  assert.doesNotMatch(extractDocumentText(documentXml), /N\u00daMERO DE PEDIDO:/);
 });
 
-test("omits order number line when it is blank", async () => {
+test("omits order number from intro when it is blank", async () => {
   const buffer = await renderConfirmationDocx(
     {
       ...fakeConfirmation(),
@@ -292,8 +297,10 @@ test("omits order number line when it is blank", async () => {
   );
   const zip = await JSZip.loadAsync(buffer);
   const documentXml = await zip.file("word/document.xml").async("string");
+  const text = extractDocumentText(documentXml);
 
-  assert.doesNotMatch(extractDocumentText(documentXml), /N\u00daMERO DE PEDIDO:/);
+  assert.doesNotMatch(text, /N\u00daMERO DE PEDIDO:/);
+  assert.doesNotMatch(text, /CON N\u00daMERO:/);
 });
 
 test("keeps body paragraph spacing tight with a blank line after long paragraphs", async () => {

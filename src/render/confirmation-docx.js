@@ -51,6 +51,7 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
         }
         if (name === "word/document.xml") {
           xml = replaceCustomerHeaderBlock(xml, confirmation);
+          xml = insertOrderNumberInIntro(xml, confirmation.orderNumber);
           xml = insertTableAfterMaterialIntro(xml, merchandiseTable);
           if (hasMultipleOrigins) {
             xml = removeOriginLine(xml);
@@ -538,6 +539,21 @@ function insertTableAfterMaterialIntro(xml, tableXml) {
   return inserted ? result : xml;
 }
 
+function insertOrderNumberInIntro(xml, orderNumber) {
+  const value = String(orderNumber || "").trim();
+  if (!value) return xml;
+
+  return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
+    if (!isMaterialIntroParagraph(paragraph)) return paragraph;
+    const text = paragraphText(paragraph);
+    if (normalizeForMatch(text).includes("con numero:")) return paragraph;
+    return replaceParagraphText(
+      paragraph,
+      text.replace(/(le agradecemos su pedido)(\s+y\s+le\s+confirmamos)/i, `$1 con n\u00famero: ${value}$2`)
+    );
+  });
+}
+
 function isMaterialIntroParagraph(paragraph) {
   const text = normalizeForMatch(paragraphText(paragraph)).replace(/\s+/g, " ").trim();
   return text.includes("le agradecemos su pedido") && text.includes("siguiente material");
@@ -744,10 +760,6 @@ function normalizeConfirmationTitleSpacing(xml, confirmation = {}) {
   }
 
   const titleParagraph = normalizeConfirmationTitleText(paragraphMatches[titleIndex][0]);
-  const orderNumberParagraph = buildOrderNumberParagraph(
-    titleParagraph,
-    confirmation.orderNumber
-  );
   const start = paragraphMatches[titleIndex].index;
   const endMatch = paragraphMatches[endIndex];
   if (start === undefined || endMatch.index === undefined) return xml;
@@ -757,7 +769,7 @@ function normalizeConfirmationTitleSpacing(xml, confirmation = {}) {
     blankLineParagraph(),
     blankLineParagraph(),
     titleParagraph,
-    ...(orderNumberParagraph ? [orderNumberParagraph] : [blankLineParagraph()]),
+    blankLineParagraph(),
     blankLineParagraph()
   ].join("");
 
@@ -1152,15 +1164,6 @@ function replaceSignatureBlockWithConfirmationNote(xml, confirmation = {}) {
   const start = headerMatch.index;
   const end = signatureMatch.index + signatureMatch[0].length;
   return `${xml.slice(0, start)}${specialConditionsParagraphs}${confirmationParagraph}${xml.slice(end)}`;
-}
-
-function buildOrderNumberParagraph(titleParagraph, orderNumber) {
-  const value = String(orderNumber || "").trim();
-  if (!value) return "";
-  return setParagraphFontSize(
-    replaceParagraphText(titleParagraph, `N\u00daMERO DE PEDIDO: ${value}`),
-    20
-  );
 }
 
 function findPreviousBodyParagraph(paragraphs, beforeIndex) {
