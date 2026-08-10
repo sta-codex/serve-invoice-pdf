@@ -33,6 +33,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parents[1]
 RENDER_SCRIPT = ROOT / "tools" / "render-sales-invoice-pdf.py"
 REASSIGNMENT_MAP_HTML = ROOT / "tools" / "reassignment-map.html"
+STA_LOGO_IMAGE = ROOT / "tools" / "sta-imagotipo-fondo-blanco.png"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8787
 FILE_CACHE: dict[str, dict] = {}
@@ -43,7 +44,7 @@ try:
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
     from openpyxl.worksheet.page import PageMargins
-    from PIL import Image as PILImage, ImageDraw
+    from PIL import Image as PILImage
 except ImportError as exc:  # pragma: no cover - environment guard
     raise SystemExit("Missing openpyxl/Pillow. Install them with: python -m pip install openpyxl pillow") from exc
 
@@ -374,17 +375,13 @@ def set_merged_value(ws, row: int, start_col: int, end_col: int, value: str, fon
 
 
 def add_sta_logo(ws) -> BytesIO:
-    logo_stream = BytesIO()
-    image = PILImage.new("RGBA", (216, 122), (255, 255, 255, 0))
-    draw = ImageDraw.Draw(image)
-    for index, color in enumerate(("#BE737E", "#A43052", "#741C35", "#4D0919")):
-        top = index * 34
-        draw.rectangle((0, top, 216, top + 20), fill=color)
-    image.save(logo_stream, format="PNG")
-    logo_stream.seek(0)
+    logo_bytes = STA_LOGO_IMAGE.read_bytes()
+    logo_stream = BytesIO(logo_bytes)
+    with PILImage.open(BytesIO(logo_bytes)) as image:
+        aspect_ratio = image.height / image.width
     logo = XLImage(logo_stream)
-    logo.width = 108
-    logo.height = 61
+    logo.width = 90
+    logo.height = logo.width * aspect_ratio
     ws.add_image(logo, "C2")
     return logo_stream
 
@@ -402,12 +399,6 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     header_fill = PatternFill("solid", fgColor="FF7A0019")
     total_fill = PatternFill("solid", fgColor="FFA43052")
     group_fill = PatternFill("solid", fgColor="FFBE737E")
-    logo_fills = [
-        PatternFill("solid", fgColor="FFBE737E"),
-        PatternFill("solid", fgColor="FFA43052"),
-        PatternFill("solid", fgColor="FF741C35"),
-        PatternFill("solid", fgColor="FF4D0919"),
-    ]
     thin_side = Side(style="thin", color="D5D5D5")
     header_side = Side(style="thin", color="6C0016")
     border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
@@ -428,11 +419,8 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
     ws.row_dimensions[1].hidden = True
     ws.row_dimensions[1].height = 4
     for top_row in range(2, 6):
-        ws.row_dimensions[top_row].height = 11.5
+        ws.row_dimensions[top_row].height = 14.6
     ws.row_dimensions[6].height = 15
-    for row, fill in zip(range(2, 6), logo_fills):
-        ws.merge_cells(start_row=row, start_column=3, end_row=row, end_column=4)
-        ws.cell(row=row, column=3).fill = fill
     logo_stream = add_sta_logo(ws)
     set_merged_value(ws, 2, 5, 9, "Steel Trade Advisors, S.L.U.", title_font, top_alignment)
     set_merged_value(ws, 3, 5, 9, "C/ Almirante, n\u00ba 22, 5A", small_font, top_alignment)
@@ -995,7 +983,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.3.3"
+    server_version = "STAInvoicePDF/0.3.4"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
