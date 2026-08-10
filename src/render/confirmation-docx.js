@@ -58,7 +58,7 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
           } else {
             xml = replaceOriginLine(xml, `ORIGEN: ${origin}`);
           }
-          xml = updateStorageLine(xml, getStorageRate(confirmation));
+          xml = updateStorageLine(xml, getStorageDetails(confirmation));
           xml = replaceSignatureBlockWithConfirmationNote(xml, confirmation);
           xml = removePackingLine(xml);
           xml = removeBankDetails(xml, isTransferPaymentTerm(confirmation.paymentTerms));
@@ -546,10 +546,12 @@ function insertOrderNumberInIntro(xml, orderNumber) {
   return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
     if (!isMaterialIntroParagraph(paragraph)) return paragraph;
     const text = paragraphText(paragraph);
-    if (normalizeForMatch(text).includes("con numero:")) return paragraph;
-    return replaceParagraphText(
-      paragraph,
-      text.replace(/(le agradecemos su pedido)(\s+y\s+le\s+confirmamos)/i, `$1 con n\u00famero: ${value}$2`)
+    if (normalizeForMatch(text).includes("con numero")) return paragraph;
+    return setParagraphBold(
+      replaceParagraphText(
+        paragraph,
+        text.replace(/(le agradecemos su pedido)(\s+y\s+le\s+confirmamos)/i, `$1 CON N\u00daMERO ${value}$2`)
+      )
     );
   });
 }
@@ -1025,13 +1027,22 @@ function shrinkHeaderLogoRun(logoRun) {
     .replace(/<a:ext cx="\d+" cy="\d+"\/>/, `<a:ext cx="${widthCx}" cy="${heightCy}"/>`);
 }
 
-function getStorageRate(confirmation) {
-  const kind = getStorageDeliveryKind(confirmation);
-  if (!kind) return "";
-  if (confirmation.hasSheetMaterial) {
-    return kind === "puerto" ? "0,25" : "0,20";
+function getStorageDetails(confirmation) {
+  if (confirmation.storageFreeDays === undefined || confirmation.storageFreeDays === null) {
+    return null;
   }
-  return kind === "puerto" ? "0,30" : "0,15";
+  const kind = getStorageDeliveryKind(confirmation);
+  if (!kind) return null;
+  if (confirmation.hasSheetMaterial) {
+    return {
+      freeDays: confirmation.storageFreeDays,
+      rate: kind === "puerto" ? "0,25" : "0,20"
+    };
+  }
+  return {
+    freeDays: confirmation.storageFreeDays,
+    rate: kind === "puerto" ? "0,30" : "0,15"
+  };
 }
 
 function getStorageDeliveryKind(confirmation) {
@@ -1053,9 +1064,9 @@ function normalizeStorageDeliveryKind(value) {
   return "";
 }
 
-function updateStorageLine(xml, storageRate) {
-  const storageText =
-    `ALMACENAJES: 30 DÍAS LIBRES A PARTIR DE LA FECHA FACTURA, TRANSCURRIDO ESE PERIODO, SE FACTURARÁ A ${storageRate} €/MT POR DÍA.`;
+function updateStorageLine(xml, storageDetails) {
+  const freeDays = storageDetails ? formatFreeDays(storageDetails.freeDays) : "";
+  const storageRate = storageDetails?.rate;
   return xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
     const normalizedText = normalizeForMatch(paragraphText(paragraph))
       .replace(/\s+/g, " ");
@@ -1068,12 +1079,31 @@ function updateStorageLine(xml, storageRate) {
       (normalizedText.includes("se facturar") && normalizedText.includes("eur/mt"));
 
     if (!isStorageParagraph) return paragraph;
-    if (!storageRate) return "";
+    if (!storageDetails || !freeDays) return "";
     return replaceParagraphText(
       paragraph,
-      storageText
+      formatStorageText(freeDays, storageRate)
     ).replace(/<w:color w:val="EE0000"\/>/g, '<w:color w:val="000000"/>');
   });
+}
+
+function formatStorageText(freeDays, storageRate) {
+  return [
+    "ALMACENAJES: ",
+    freeDays,
+    " D\u00cdAS LIBRES A PARTIR DE LA FECHA FACTURA, TRANSCURRIDO ESE PERIODO, SE FACTURAR\u00c1 A ",
+    storageRate,
+    " \u20ac/MT POR D\u00cdA."
+  ].join("");
+}
+
+function formatFreeDays(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "";
+  return new Intl.NumberFormat("es-ES", {
+    maximumFractionDigits: 2,
+    useGrouping: true
+  }).format(number);
 }
 
 function replaceReclamacionesLine(xml) {

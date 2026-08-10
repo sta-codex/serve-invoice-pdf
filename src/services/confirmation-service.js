@@ -255,6 +255,7 @@ function normalizeConfirmation({
       fields[CONTRATO_VENTA.TERMINOS_PAGO],
       linkedNames.paymentTerms
     ),
+    storageFreeDays: numberValue(fields[CONTRATO_VENTA.DIAS_LIBRES]),
     specialConditions,
     downPayments: normalizeDownPayments(downPaymentRecords),
     toleranceMinus: numberValue(fields[CONTRATO_VENTA.TOLERANCIA_MENOS]),

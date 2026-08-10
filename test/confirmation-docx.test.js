@@ -282,7 +282,7 @@ test("shows order number inside the material intro when present", async () => {
   assert.ok(introParagraph);
   assert.match(
     extractParagraphText(introParagraph),
-    /LE AGRADECEMOS SU PEDIDO con n\u00famero: PO-12345 Y LE CONFIRMAMOS/
+    /LE AGRADECEMOS SU PEDIDO CON N\u00daMERO PO-12345 Y LE CONFIRMAMOS/
   );
   assert.doesNotMatch(extractDocumentText(documentXml), /N\u00daMERO DE PEDIDO:/);
 });
@@ -300,7 +300,7 @@ test("omits order number from intro when it is blank", async () => {
   const text = extractDocumentText(documentXml);
 
   assert.doesNotMatch(text, /N\u00daMERO DE PEDIDO:/);
-  assert.doesNotMatch(text, /CON N\u00daMERO:/);
+  assert.doesNotMatch(text, /CON N\u00daMERO/);
 });
 
 test("keeps body paragraph spacing tight with a blank line after long paragraphs", async () => {
@@ -331,11 +331,13 @@ test("keeps only labels bold in colon-separated paragraphs", async () => {
       ...fakeConfirmation(),
       origin: "Planta Madrid (ES / FR)",
       totalQuantity: 12345.678,
+      storageFreeDays: 30,
       paymentTerms: "Carta de crédito a 30 días fecha factura",
       items: [
         {
           ...fakeConfirmation().items[0],
-          hasStorageDeliveryPlace: true
+          hasStorageDeliveryPlace: true,
+          storageDeliveryKind: "almacen"
         }
       ]
     },
@@ -685,6 +687,7 @@ test("shows storage line only for eligible client delivery places with rate by m
     const noStorageBuffer = await renderConfirmationDocx(
       {
         ...fakeConfirmation(),
+        storageFreeDays: 30,
         items: [
           {
             ...fakeConfirmation().items[0],
@@ -711,6 +714,7 @@ test("shows storage line only for eligible client delivery places with rate by m
         {
           ...fakeConfirmation(),
           hasSheetMaterial: scenario.hasSheetMaterial,
+          storageFreeDays: 30,
           items: [
             {
               ...fakeConfirmation().items[0],
@@ -738,6 +742,7 @@ test("shows storage line only for eligible client delivery places with rate by m
     const accentedStorageBuffer = await renderConfirmationDocx(
       {
         ...fakeConfirmation(),
+        storageFreeDays: 30,
         items: [
           {
             ...fakeConfirmation().items[0],
@@ -754,6 +759,49 @@ test("shows storage line only for eligible client delivery places with rate by m
 
     assert.ok(storageParagraph(accentedStorageXml));
   }
+});
+
+test("uses the sales contract free days value in the storage line", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      storageFreeDays: 45,
+      items: [
+        {
+          ...fakeConfirmation().items[0],
+          hasStorageDeliveryPlace: true,
+          storageDeliveryKind: "almacen"
+        }
+      ]
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+  const storageLine = storageParagraph(documentXml);
+
+  assert.ok(storageLine);
+  assert.match(extractParagraphText(storageLine), /ALMACENAJES: 45 D\u00cdAS LIBRES/);
+});
+
+test("omits storage line when sales contract free days is blank", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      items: [
+        {
+          ...fakeConfirmation().items[0],
+          hasStorageDeliveryPlace: true,
+          storageDeliveryKind: "almacen"
+        }
+      ]
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+
+  assert.equal(storageParagraph(documentXml), undefined);
 });
 
 function fakeConfirmation() {

@@ -58,6 +58,7 @@ export const CONTRATO_VENTA = {
   TOLERANCIA_MENOS: "fldIGNZFIIW0n5zt5",
   TOLERANCIA_MAS: "fldyvgrgAA0HYgDSn",
   MONEDA: "fldfAYJqypZS9nIlw",
+  DIAS_LIBRES: "fld0xG8kb8RHKeHu9",
   ANTICIPOS: "fldW3cX73zzqv5ZPt",
   PAGO: "fldX3lewbUGpXejsL",
   ITEMS: "fldSSpBbTESUG8Z2T",
