@@ -681,7 +681,7 @@ test("omits special conditions section when it is empty", async () => {
   assert.doesNotMatch(extractDocumentText(documentXml), /CONDICIONES ESPECIALES/);
 });
 
-test("shows storage line only for eligible client delivery places with rate by material type", async () => {
+test("shows storage line when sales contract free days has a value", async () => {
   const modes = ["formato1", "formato2", "formato3"];
   for (const mode of modes) {
     const noStorageBuffer = await renderConfirmationDocx(
@@ -702,7 +702,7 @@ test("shows storage line only for eligible client delivery places with rate by m
     const noStorageDoc = await JSZip.loadAsync(noStorageBuffer);
     const noStorageXml = await noStorageDoc.file("word/document.xml").async("string");
 
-    assert.equal(storageParagraph(noStorageXml), undefined);
+    assert.ok(storageParagraph(noStorageXml));
 
     for (const scenario of [
       { hasSheetMaterial: false, storageDeliveryKind: "almacen", rate: "0,15" },
@@ -782,6 +782,33 @@ test("uses the sales contract free days value in the storage line", async () => 
 
   assert.ok(storageLine);
   assert.match(extractParagraphText(storageLine), /ALMACENAJES: 45 D\u00cdAS LIBRES/);
+});
+
+test("uses free days and client storage price even when storage kind is not detected", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      storageFreeDays: 15,
+      storageClientPrice: 0.22,
+      items: [
+        {
+          ...fakeConfirmation().items[0],
+          hasStorageDeliveryPlace: false,
+          storageDeliveryKind: ""
+        }
+      ]
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+  const storageLine = storageParagraph(documentXml);
+
+  assert.ok(storageLine);
+  assert.equal(
+    extractParagraphText(storageLine),
+    "ALMACENAJES: 15 D\u00cdAS LIBRES A PARTIR DE LA FECHA FACTURA, TRANSCURRIDO ESE PERIODO, SE FACTURAR\u00c1 A 0,22 \u20ac/MT POR D\u00cdA."
+  );
 });
 
 test("omits storage line when sales contract free days is blank", async () => {

@@ -1031,8 +1031,14 @@ function getStorageDetails(confirmation) {
   if (confirmation.storageFreeDays === undefined || confirmation.storageFreeDays === null) {
     return null;
   }
+  const clientRate = formatStorageRate(confirmation.storageClientPrice);
+  if (clientRate) {
+    return {
+      freeDays: confirmation.storageFreeDays,
+      rate: clientRate
+    };
+  }
   const kind = getStorageDeliveryKind(confirmation);
-  if (!kind) return null;
   if (confirmation.hasSheetMaterial) {
     return {
       freeDays: confirmation.storageFreeDays,
@@ -1101,6 +1107,16 @@ function formatFreeDays(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return "";
   return new Intl.NumberFormat("es-ES", {
+    maximumFractionDigits: 2,
+    useGrouping: true
+  }).format(number);
+}
+
+function formatStorageRate(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "";
+  return new Intl.NumberFormat("es-ES", {
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
     useGrouping: true
   }).format(number);
