@@ -346,6 +346,64 @@ def xlsx_sheet_col(logical_col: int, visible_start_col: int) -> int:
     return visible_start_col + logical_col - 3
 
 
+def centered_table_widths(
+    sheet_widths: dict[int, float],
+    table_start_col: int,
+    table_last_col: int,
+) -> dict[int, float]:
+    """Center the table without moving the three fixed corporate-header blocks."""
+    centered = dict(sheet_widths)
+    left_width = sum(centered[col] for col in range(3, table_start_col))
+    right_width = sum(centered[col] for col in range(table_last_col + 1, 15))
+    imbalance = left_width - right_width
+    if abs(imbalance) < 1e-9:
+        return centered
+
+    coefficients = {
+        col: 1.0 if col < table_start_col else -1.0 if col > table_last_col else 0.0
+        for col in range(3, 15)
+    }
+    projected: dict[int, float] = {}
+    for segment_start, segment_end in ((3, 4), (5, 9), (10, 14)):
+        segment = range(segment_start, segment_end + 1)
+        mean = sum(coefficients[col] for col in segment) / len(segment)
+        for col in segment:
+            projected[col] = coefficients[col] - mean
+
+    denominator = sum(value * value for value in projected.values())
+    if denominator < 1e-9:
+        return centered
+    scale = -imbalance / denominator
+    for col, value in projected.items():
+        centered[col] += scale * value
+    if min(centered.values()) >= 4.0:
+        return centered
+
+    centered = dict(sheet_widths)
+    remaining_change = -imbalance
+    segments = ((3, 4), (5, 9), (10, 14))
+    while abs(remaining_change) >= 1e-9:
+        direction = 1.0 if remaining_change > 0 else -1.0
+        opportunities = []
+        for segment_start, segment_end in segments:
+            for source_col in range(segment_start, segment_end + 1):
+                available = centered[source_col] - 4.0
+                if available <= 1e-9:
+                    continue
+                for destination_col in range(segment_start, segment_end + 1):
+                    effect = coefficients[destination_col] - coefficients[source_col]
+                    if direction * effect > 0:
+                        opportunities.append((abs(effect), available, source_col, destination_col, effect))
+        if not opportunities:
+            return dict(sheet_widths)
+        effect_size, available, source_col, destination_col, effect = max(opportunities)
+        transfer = min(available, abs(remaining_change) / effect_size)
+        centered[source_col] -= transfer
+        centered[destination_col] += transfer
+        remaining_change -= transfer * effect
+    return centered
+
+
 def style_row(
     ws,
     row: int,
@@ -586,10 +644,12 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
 
     for index, width in enumerate(widths[:2], start=1):
         ws.column_dimensions[get_column_letter(index)].width = width
-    for index, width in enumerate(widths[2:], start=3):
-        ws.column_dimensions[get_column_letter(index)].width = width
+    sheet_widths = {index: width for index, width in enumerate(widths[2:], start=3)}
     for index in range(col_count + 1, header_col_count + 1):
-        ws.column_dimensions[get_column_letter(index)].width = all_widths[index - 1]
+        sheet_widths[index] = all_widths[index - 1]
+    sheet_widths = centered_table_widths(sheet_widths, visible_start_col, table_last_col)
+    for index in range(3, header_col_count + 1):
+        ws.column_dimensions[get_column_letter(index)].width = sheet_widths[index]
     ws.column_dimensions["A"].hidden = True
     ws.column_dimensions["B"].hidden = True
     for row_cells in ws.iter_rows(min_row=total_row, max_row=last_row):
@@ -1051,7 +1111,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.3.10"
+    server_version = "STAInvoicePDF/0.3.11"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
