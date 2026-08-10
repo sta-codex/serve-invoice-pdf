@@ -7,6 +7,7 @@ const TEMPLATE_URL = new URL("../templates/confirmacion-pedido.docx", import.met
 const VAT_RATE = 0.21;
 const TABLE_WIDTHS = [650, 2350, 950, 1200, 1100, 1100, 1300, 1200];
 const STA_HEADER_LEFT_MARGIN_REDUCTION_DXA = 432;
+const BODY_PARAGRAPH_FONT_SIZE = 20;
 const LABEL_VALUE_PREFIXES = [
   "origen",
   "cantidad total",
@@ -51,8 +52,8 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
         }
         if (name === "word/document.xml") {
           xml = replaceCustomerHeaderBlock(xml, confirmation);
-          xml = insertOrderNumberInIntro(xml, confirmation.orderNumber);
           xml = insertTableAfterMaterialIntro(xml, merchandiseTable);
+          xml = insertOrderNumberInIntro(xml, confirmation.orderNumber);
           if (hasMultipleOrigins) {
             xml = removeOriginLine(xml);
           } else {
@@ -547,12 +548,13 @@ function insertOrderNumberInIntro(xml, orderNumber) {
     if (!isMaterialIntroParagraph(paragraph)) return paragraph;
     const text = paragraphText(paragraph);
     if (normalizeForMatch(text).includes("con numero")) return paragraph;
-    return setParagraphBold(
-      replaceParagraphText(
-        paragraph,
-        text.replace(/(le agradecemos su pedido)(\s+y\s+le\s+confirmamos)/i, `$1 CON N\u00daMERO ${value}$2`)
-      )
-    );
+    const match = text.match(/^(.*?le agradecemos su pedido)(\s+y\s+le\s+confirmamos[\s\S]*)$/i);
+    if (!match) return paragraph;
+    return replaceParagraphRuns(paragraph, [
+      { text: match[1], bold: false },
+      { text: ` CON N\u00daMERO ${value}`, bold: true },
+      { text: match[2], bold: false }
+    ]);
   });
 }
 
@@ -601,16 +603,36 @@ function blankLineParagraph() {
 }
 
 function applyDocumentLayoutRules(xml, confirmation = {}) {
-  return normalizeConfirmationTitleSpacing(
-    collapseConsecutiveBlankParagraphs(
-      normalizeLongParagraphSpacing(
-        normalizeLabelValueBold(
-          shrinkIntroParagraph(xml)
+  return normalizeBodyParagraphFontSizeAfterMerchandiseTable(
+    normalizeConfirmationTitleSpacing(
+      collapseConsecutiveBlankParagraphs(
+        normalizeLongParagraphSpacing(
+          normalizeLabelValueBold(
+            shrinkIntroParagraph(xml)
+          )
         )
-      )
-    ),
-    confirmation
+      ),
+      confirmation
+    )
   );
+}
+
+function normalizeBodyParagraphFontSizeAfterMerchandiseTable(xml) {
+  const materialIntroIndex = xml.indexOf("SIGUIENTE MATERIAL:");
+  const searchStart = materialIntroIndex >= 0 ? materialIntroIndex : 0;
+  const tableStart = xml.indexOf("<w:tbl>", searchStart);
+  if (tableStart < 0) return xml;
+
+  const tableEnd = xml.indexOf("</w:tbl>", tableStart);
+  if (tableEnd < 0) return xml;
+
+  const splitIndex = tableEnd + "</w:tbl>".length;
+  const before = xml.slice(0, splitIndex);
+  const after = xml.slice(splitIndex).replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraph) => {
+    if (paragraph.includes("<w:drawing")) return paragraph;
+    return setParagraphFontSize(paragraph, BODY_PARAGRAPH_FONT_SIZE);
+  });
+  return `${before}${after}`;
 }
 
 function normalizeLabelValueBold(xml) {
@@ -897,8 +919,18 @@ function setParagraphFontSize(paragraph, size) {
   const sizeXml = `<w:sz w:val="${size}"/>`;
   const complexSizeXml = `<w:szCs w:val="${size}"/>`;
   return paragraph
-    .replace(/<w:sz w:val="\d+"\/>/g, sizeXml)
-    .replace(/<w:szCs w:val="\d+"\/>/g, complexSizeXml);
+    .replace(/<w:rPr>[\s\S]*?<\/w:rPr>/g, (runProperties) => {
+      let updated = runProperties
+        .replace(/<w:sz w:val="\d+"\/>/g, sizeXml)
+        .replace(/<w:szCs w:val="\d+"\/>/g, complexSizeXml);
+      if (!/<w:sz\b/.test(updated)) {
+        updated = updated.replace("</w:rPr>", `${sizeXml}</w:rPr>`);
+      }
+      if (!/<w:szCs\b/.test(updated)) {
+        updated = updated.replace("</w:rPr>", `${complexSizeXml}</w:rPr>`);
+      }
+      return updated;
+    });
 }
 
 function replaceCustomerHeaderBlock(xml, confirmation) {

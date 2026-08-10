@@ -284,6 +284,17 @@ test("shows order number inside the material intro when present", async () => {
     extractParagraphText(introParagraph),
     /LE AGRADECEMOS SU PEDIDO CON N\u00daMERO PO-12345 Y LE CONFIRMAMOS/
   );
+  const runs = textRuns(introParagraph);
+  const prefixRun = runs.find((run) => run.text === "LE AGRADECEMOS SU PEDIDO");
+  const orderNumberRun = runs.find((run) => run.text === "CON N\u00daMERO PO-12345");
+  const suffixRun = runs.find((run) => run.text.startsWith("Y LE CONFIRMAMOS"));
+
+  assert.ok(prefixRun);
+  assert.ok(orderNumberRun);
+  assert.ok(suffixRun);
+  assert.doesNotMatch(prefixRun.xml, /<w:b\b/);
+  assert.match(orderNumberRun.xml, /<w:b\/>/);
+  assert.doesNotMatch(suffixRun.xml, /<w:b\b/);
   assert.doesNotMatch(extractDocumentText(documentXml), /N\u00daMERO DE PEDIDO:/);
 });
 
@@ -354,6 +365,48 @@ test("keeps only labels bold in colon-separated paragraphs", async () => {
   assertBodyLabelLayout(documentXml, "CONDICIONES DE PAGO:");
   assertOnlyLabelBold(documentXml, "ALMACENAJES:", "30 DÍAS LIBRES");
   assertOnlyLabelBold(documentXml, "RECLAMACIONES:", "Si se encuentran daños");
+});
+
+test("keeps all body paragraphs after the merchandise table at the same font size", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      origin: "Planta Madrid (ES / FR)",
+      storageFreeDays: 15,
+      storageClientPrice: 0.22,
+      specialConditions: "Condici\u00f3n especial de prueba.",
+      items: [
+        {
+          ...fakeConfirmation().items[0],
+          hasStorageDeliveryPlace: true,
+          storageDeliveryKind: "almacen"
+        }
+      ]
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+  const bodyParagraphs = paragraphsAfterMerchandiseTable(documentXml);
+
+  for (const label of [
+    "ORIGEN:",
+    "CANTIDAD TOTAL:",
+    "CONDICIONES DE ENTREGA:",
+    "CONDICIONES DE PAGO:",
+    "ALMACENAJES:",
+    "DOCUMENTOS:",
+    "RECLAMACIONES:",
+    "FUERZA MAYOR:"
+  ]) {
+    assertParagraphRunsUseFontSize(bodyParagraphs, label, "20");
+  }
+
+  assertParagraphRunsUseFontSize(bodyParagraphs, "FACTURA COMERCIAL ORIGINAL", "20");
+  assertParagraphRunsUseFontSize(bodyParagraphs, "Fuerza mayor es el evento imprevisto", "20");
+  assertParagraphRunsUseFontSize(bodyParagraphs, "CONDICIONES ESPECIALES", "20");
+  assertParagraphRunsUseFontSize(bodyParagraphs, "Condici\u00f3n especial de prueba.", "20");
+  assertParagraphRunsUseFontSize(bodyParagraphs, "Salvo comunicaci", "20");
 });
 
 test("adds down payments to payment terms", async () => {
@@ -928,6 +981,28 @@ function assertBodyLabelLayout(documentXml, label) {
   assert.match(paragraphProperties, /<w:pStyle w:val="Textoindependiente"\/>/);
   assert.match(paragraphProperties, /<w:spacing w:line="220" w:lineRule="atLeast"\/>/);
   assert.match(paragraphProperties, /<w:ind\b[^>]*w:left="0"/);
+}
+
+function paragraphsAfterMerchandiseTable(documentXml) {
+  const materialIndex = documentXml.indexOf("SIGUIENTE MATERIAL:");
+  const tableStart = documentXml.indexOf("<w:tbl>", materialIndex);
+  assert.ok(tableStart >= 0, "The merchandise table should exist");
+  const tableEnd = documentXml.indexOf("</w:tbl>", tableStart);
+  assert.ok(tableEnd >= 0, "The merchandise table should close");
+  return [...documentXml.slice(tableEnd).matchAll(/<w:p[\s\S]*?<\/w:p>/g)]
+    .map((match) => match[0]);
+}
+
+function assertParagraphRunsUseFontSize(paragraphs, textStart, expectedSize) {
+  const paragraph = paragraphs.find((candidate) =>
+    extractParagraphText(candidate).startsWith(textStart)
+  );
+  assert.ok(paragraph, `${textStart} paragraph should exist after the merchandise table`);
+
+  for (const run of textRuns(paragraph).filter((candidate) => candidate.text.trim())) {
+    assert.match(run.xml, new RegExp(`<w:sz w:val="${expectedSize}"\\/>`));
+    assert.match(run.xml, new RegExp(`<w:szCs w:val="${expectedSize}"\\/>`));
+  }
 }
 
 function textRuns(paragraph) {
