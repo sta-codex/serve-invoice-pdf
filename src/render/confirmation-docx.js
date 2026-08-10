@@ -64,7 +64,7 @@ export async function renderConfirmationDocx(confirmation, { mode }) {
           xml = replaceDocumentCertificateLine(xml);
           xml = replaceReclamacionesLine(xml);
           xml = normalizeLegalCommonNouns(xml);
-          xml = applyDocumentLayoutRules(xml);
+          xml = applyDocumentLayoutRules(xml, confirmation);
         }
         zip.file(name, xml);
       })
@@ -582,7 +582,7 @@ function blankLineParagraph() {
   ].join("");
 }
 
-function applyDocumentLayoutRules(xml) {
+function applyDocumentLayoutRules(xml, confirmation = {}) {
   return normalizeConfirmationTitleSpacing(
     collapseConsecutiveBlankParagraphs(
       normalizeLongParagraphSpacing(
@@ -590,7 +590,8 @@ function applyDocumentLayoutRules(xml) {
           shrinkIntroParagraph(xml)
         )
       )
-    )
+    ),
+    confirmation
   );
 }
 
@@ -729,7 +730,7 @@ function setParagraphLeftIndent(paragraph, left) {
   return paragraph.replace(/<w:p([^>]*)>/, `<w:p$1><w:pPr>${indent}</w:pPr>`);
 }
 
-function normalizeConfirmationTitleSpacing(xml) {
+function normalizeConfirmationTitleSpacing(xml, confirmation = {}) {
   const paragraphMatches = [...xml.matchAll(/<w:p[\s\S]*?<\/w:p>/g)];
   const titleIndex = paragraphMatches.findIndex((match) => isConfirmationTitleParagraph(match[0]));
   if (titleIndex < 0) return xml;
@@ -743,6 +744,10 @@ function normalizeConfirmationTitleSpacing(xml) {
   }
 
   const titleParagraph = normalizeConfirmationTitleText(paragraphMatches[titleIndex][0]);
+  const orderNumberParagraph = buildOrderNumberParagraph(
+    titleParagraph,
+    confirmation.orderNumber
+  );
   const start = paragraphMatches[titleIndex].index;
   const endMatch = paragraphMatches[endIndex];
   if (start === undefined || endMatch.index === undefined) return xml;
@@ -752,7 +757,7 @@ function normalizeConfirmationTitleSpacing(xml) {
     blankLineParagraph(),
     blankLineParagraph(),
     titleParagraph,
-    blankLineParagraph(),
+    ...(orderNumberParagraph ? [orderNumberParagraph] : [blankLineParagraph()]),
     blankLineParagraph()
   ].join("");
 
@@ -1147,6 +1152,15 @@ function replaceSignatureBlockWithConfirmationNote(xml, confirmation = {}) {
   const start = headerMatch.index;
   const end = signatureMatch.index + signatureMatch[0].length;
   return `${xml.slice(0, start)}${specialConditionsParagraphs}${confirmationParagraph}${xml.slice(end)}`;
+}
+
+function buildOrderNumberParagraph(titleParagraph, orderNumber) {
+  const value = String(orderNumber || "").trim();
+  if (!value) return "";
+  return setParagraphFontSize(
+    replaceParagraphText(titleParagraph, `N\u00daMERO DE PEDIDO: ${value}`),
+    20
+  );
 }
 
 function findPreviousBodyParagraph(paragraphs, beforeIndex) {

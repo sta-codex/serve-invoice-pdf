@@ -258,6 +258,44 @@ test("replaces merchandise header and origin line", async () => {
   assert.match(text, /CONDICIONES DE ENTREGA: DDP Llanera/);
 });
 
+test("shows order number after confirmation title when present", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      contractNumber: "STA-2026-030",
+      orderNumber: "PO-12345"
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+  const paragraphs = [...documentXml.matchAll(/<w:p[\s\S]*?<\/w:p>/g)].map((match) => match[0]);
+  const titleIndex = paragraphs.findIndex(
+    (paragraph) => extractParagraphText(paragraph) === "CONFIRMACI\u00d3N DE PEDIDO STA-2026-030"
+  );
+
+  assert.ok(titleIndex >= 0);
+  assert.equal(extractParagraphText(paragraphs[titleIndex + 1]), "N\u00daMERO DE PEDIDO: PO-12345");
+  assert.equal(extractParagraphText(paragraphs[titleIndex + 2]), "");
+  assert.ok(
+    extractParagraphText(paragraphs[titleIndex + 3]).includes("LE AGRADECEMOS SU PEDIDO")
+  );
+});
+
+test("omits order number line when it is blank", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      orderNumber: "   "
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+
+  assert.doesNotMatch(extractDocumentText(documentXml), /N\u00daMERO DE PEDIDO:/);
+});
+
 test("keeps body paragraph spacing tight with a blank line after long paragraphs", async () => {
   const buffer = await renderConfirmationDocx(fakeConfirmation(), { mode: "formato3" });
   const zip = await JSZip.loadAsync(buffer);
