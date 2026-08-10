@@ -464,27 +464,28 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         set_merged_value(ws, offset, customer_col, header_col_count, line, font, top_alignment)
 
     description = f"Commercial Invoice Detail Number: {invoice.invoice_id}"
-    ws.cell(row=8, column=visible_start_col, value=description)
-    ws.merge_cells(
-        start_row=8,
-        start_column=visible_start_col,
-        end_row=8,
-        end_column=table_last_col,
-    )
     ws.cell(row=8, column=header_col_count, value=invoice.date_text)
-    ws.cell(row=8, column=visible_start_col).font = Font(name="Arial", size=8, bold=True)
-    ws.cell(row=8, column=visible_start_col).alignment = Alignment(
+    ws.cell(row=8, column=header_col_count).font = Font(name="Arial", size=8)
+    ws.cell(row=8, column=header_col_count).alignment = Alignment(vertical="center", horizontal="right")
+    ws.cell(row=9, column=3, value=description)
+    ws.merge_cells(
+        start_row=9,
+        start_column=3,
+        end_row=9,
+        end_column=header_col_count,
+    )
+    ws.cell(row=9, column=3).font = Font(name="Arial", size=8, bold=True)
+    ws.cell(row=9, column=3).alignment = Alignment(
         vertical="center",
         horizontal="center",
         shrink_to_fit=True,
     )
-    ws.cell(row=8, column=header_col_count).font = Font(name="Arial", size=8)
-    ws.cell(row=8, column=header_col_count).alignment = Alignment(vertical="center", horizontal="right")
     ws.row_dimensions[7].height = 7
-    ws.row_dimensions[8].height = 18
-    ws.row_dimensions[9].height = 7
+    ws.row_dimensions[8].height = 14
+    ws.row_dimensions[9].height = 18
+    ws.row_dimensions[10].height = 7
 
-    header_row = 10
+    header_row = 11
     for index, header in enumerate(headers, start=1):
         ws.cell(row=header_row, column=xlsx_sheet_col(index, visible_start_col), value=header)
     ws.row_dimensions[header_row].height = 18
@@ -595,7 +596,7 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         for cell in row_cells:
             if isinstance(cell.value, (int, float)):
                 cell.number_format = "0.000" if cell.column >= weight_start_sheet_col else "0"
-    ws.freeze_panes = f"{get_column_letter(visible_start_col)}12"
+    ws.freeze_panes = f"{get_column_letter(visible_start_col)}13"
     ws.sheet_view.showGridLines = False
     registry_footer = f'&"Arial"&6&K888888{RENDERER.REGISTRY_LINE}'
     ws.oddFooter.center.text = registry_footer
@@ -1050,7 +1051,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.3.9"
+    server_version = "STAInvoicePDF/0.3.10"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
