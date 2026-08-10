@@ -707,12 +707,11 @@ def detail_description(line: Line) -> str:
                 line.material,
                 normalize_thickness_in_measure(line.dimensions),
                 line_characteristics(line),
-                line.factory_id,
             ]
         )
     )
     packing = clean_packing_text(line.packing)
-    return " - ".join(part for part in [main, packing] if part)
+    return " - ".join(part for part in [main, packing, line.factory_id] if part)
 
 
 def detail_description_parts(line: Line) -> tuple[str, str]:
@@ -722,11 +721,13 @@ def detail_description_parts(line: Line) -> tuple[str, str]:
                 line.material,
                 normalize_thickness_in_measure(line.dimensions),
                 line_characteristics(line),
-                line.factory_id,
             ]
         )
     )
-    return main, clean_packing_text(line.packing)
+    packing_and_factory = " - ".join(
+        part for part in [clean_packing_text(line.packing), line.factory_id] if part
+    )
+    return main, packing_and_factory
 
 
 def fit_text_to_width(text: str, max_width: float, font: str, size: float) -> str:
