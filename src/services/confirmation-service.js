@@ -371,12 +371,12 @@ function normalizeSaleItem({
   const deliveryPlace =
     deliveryPlaces.map((place) => place.name).filter(Boolean).join(" / ") ||
     firstText(fields[ITEM_VENTA_LUGAR_ENTREGA_FIELD_ID]);
-  const storageDeliveryKind = storageDeliveryKindFromPlaces(deliveryPlaces);
   const itemDeliveryTerms = deliveryTermsWithPlace(
     normalizeDeliveryTerm(firstText(fields[ITEM_VENTA_INCOTERM_VENTA_FIELD_ID])) ||
       contractDeliveryTerms,
     deliveryPlace
   );
+  const storageDeliveryKind = storageDeliveryKindFromPlaces(deliveryPlaces, itemDeliveryTerms);
   const specification = buildSpecification({
     material: linkedText(primaryPurchaseFields[ITEM_COMPRA.MATERIAL], linkedNames.materials),
     quality: linkedText(primaryPurchaseFields[ITEM_COMPRA.CALIDAD], linkedNames.qualities),
@@ -504,12 +504,18 @@ async function loadDeliveryPlacesById(client, deliveryPlaceIds) {
   );
 }
 
-export function storageDeliveryKindFromPlaces(places) {
+export function storageDeliveryKindFromPlaces(places, deliveryTerms = "") {
+  const normalizedDeliveryTerms = normalizeText(deliveryTerms);
+  const isDdp = normalizedDeliveryTerms === "ddp" || normalizedDeliveryTerms.startsWith("ddp ");
   const eligibleTypes = places
     .map((place) => normalizeText(place?.type))
-    .filter((type) => type === "ddp puerto" || type === "ddp almacen");
-  if (eligibleTypes.includes("ddp puerto")) return "puerto";
-  if (eligibleTypes.includes("ddp almacen")) return "almacen";
+    .filter((type) =>
+      type === "ddp puerto" ||
+      type === "ddp almacen" ||
+      (isDdp && (type === "puerto" || type === "almacen"))
+    );
+  if (eligibleTypes.includes("ddp puerto") || eligibleTypes.includes("puerto")) return "puerto";
+  if (eligibleTypes.includes("ddp almacen") || eligibleTypes.includes("almacen")) return "almacen";
   return "";
 }
 

@@ -79,4 +79,12 @@ test("uses only DDP delivery place types for storage kind", () => {
     storageDeliveryKindFromPlaces([{ type: "Almacén", name: "ALMACÉN TELEMIX" }]),
     ""
   );
+  assert.equal(
+    storageDeliveryKindFromPlaces([{ type: "Almacén", name: "Mobiliario (Paterna)" }], "DDP Mobiliario (Paterna)"),
+    "almacen"
+  );
+  assert.equal(
+    storageDeliveryKindFromPlaces([{ type: "Puerto", name: "Puerto de Sagunto" }], "DDP Puerto de Sagunto"),
+    "puerto"
+  );
 });
