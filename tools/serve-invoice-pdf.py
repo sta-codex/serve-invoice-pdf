@@ -425,6 +425,7 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         index for index, header in enumerate(headers, start=1) if header in {"Neto", "Bruto"}
     )
     weight_start_sheet_col = xlsx_sheet_col(weight_start_col, visible_start_col)
+    table_last_col = xlsx_sheet_col(col_count, visible_start_col)
 
     header_fill = PatternFill("solid", fgColor="FF7A0019")
     total_fill = PatternFill("solid", fgColor="FFA43052")
@@ -463,11 +464,20 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
         set_merged_value(ws, offset, customer_col, header_col_count, line, font, top_alignment)
 
     description = f"Commercial Invoice Detail Number: {invoice.invoice_id}"
-    ws.cell(row=8, column=3, value=description)
-    ws.merge_cells(start_row=8, start_column=3, end_row=8, end_column=header_col_count - 1)
+    ws.cell(row=8, column=visible_start_col, value=description)
+    ws.merge_cells(
+        start_row=8,
+        start_column=visible_start_col,
+        end_row=8,
+        end_column=table_last_col,
+    )
     ws.cell(row=8, column=header_col_count, value=invoice.date_text)
-    ws.cell(row=8, column=3).font = Font(name="Arial", size=8, bold=True)
-    ws.cell(row=8, column=3).alignment = Alignment(vertical="center", horizontal="left", shrink_to_fit=True)
+    ws.cell(row=8, column=visible_start_col).font = Font(name="Arial", size=8, bold=True)
+    ws.cell(row=8, column=visible_start_col).alignment = Alignment(
+        vertical="center",
+        horizontal="center",
+        shrink_to_fit=True,
+    )
     ws.cell(row=8, column=header_col_count).font = Font(name="Arial", size=8)
     ws.cell(row=8, column=header_col_count).alignment = Alignment(vertical="center", horizontal="right")
     ws.row_dimensions[7].height = 7
@@ -566,7 +576,6 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
             row += 1
 
     last_row = max(total_row, row - 1)
-    table_last_col = xlsx_sheet_col(col_count, visible_start_col)
     table_last_col_letter = get_column_letter(table_last_col)
     print_last_col_letter = get_column_letter(header_col_count)
     table_start_col_letter = get_column_letter(visible_start_col)
@@ -576,16 +585,10 @@ def render_invoice_detail_xlsx_bytes(invoice) -> tuple[bytes, str]:
 
     for index, width in enumerate(widths[:2], start=1):
         ws.column_dimensions[get_column_letter(index)].width = width
-    available_width = sum(all_widths[2:header_col_count])
-    table_width = sum(widths[2:])
-    side_width = max(0, available_width - table_width) / 2
-    right_spacer_cols = header_col_count - table_last_col
-    for index in range(3, visible_start_col):
-        ws.column_dimensions[get_column_letter(index)].width = side_width / left_spacer_cols
-    for offset, width in enumerate(widths[2:]):
-        ws.column_dimensions[get_column_letter(visible_start_col + offset)].width = width
-    for index in range(table_last_col + 1, header_col_count + 1):
-        ws.column_dimensions[get_column_letter(index)].width = side_width / right_spacer_cols
+    for index, width in enumerate(widths[2:], start=3):
+        ws.column_dimensions[get_column_letter(index)].width = width
+    for index in range(col_count + 1, header_col_count + 1):
+        ws.column_dimensions[get_column_letter(index)].width = all_widths[index - 1]
     ws.column_dimensions["A"].hidden = True
     ws.column_dimensions["B"].hidden = True
     for row_cells in ws.iter_rows(min_row=total_row, max_row=last_row):
@@ -1047,7 +1050,7 @@ def upload_attachment(config: dict, record_id: str, pdf_bytes: bytes, filename: 
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STAInvoicePDF/0.3.6"
+    server_version = "STAInvoicePDF/0.3.7"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib API
         self.send_response(HTTPStatus.NO_CONTENT)
