@@ -729,6 +729,49 @@ def detail_description_parts(line: Line) -> tuple[str, str]:
     return main, clean_packing_text(line.packing)
 
 
+def fit_text_to_width(text: str, max_width: float, font: str, size: float) -> str:
+    text = clean_text(text)
+    if pdfmetrics.stringWidth(text, font, size) <= max_width:
+        return text
+    ellipsis = "..."
+    while text and pdfmetrics.stringWidth(text + ellipsis, font, size) > max_width:
+        text = text[:-1]
+    return text + ellipsis if text else ellipsis
+
+
+def detail_description_lines(
+    line: Line,
+    max_width: float,
+    font: str = REGULAR_FONT,
+    size: float = 5.8,
+) -> list[str]:
+    text = detail_description(line)
+    if pdfmetrics.stringWidth(text, font, size) <= max_width:
+        return [text]
+
+    words = text.split()
+    first_line = ""
+    for index, word in enumerate(words):
+        candidate = f"{first_line} {word}".strip()
+        if not first_line or pdfmetrics.stringWidth(candidate, font, size) <= max_width:
+            first_line = candidate
+            continue
+        second_line = " ".join(words[index:])
+        return [
+            fit_text_to_width(first_line, max_width, font, size),
+            fit_text_to_width(second_line, max_width, font, size),
+        ]
+    return [fit_text_to_width(first_line, max_width, font, size)]
+
+
+def detail_line_height(line: Line, desc_width: float) -> float:
+    return 9.5 if len(detail_description_lines(line, desc_width - 12)) == 1 else 15.0
+
+
+def invoice_line_height(line: Line, mode: str, desc_width: float) -> float:
+    return 12.0 if mode == "grouped" else detail_line_height(line, desc_width)
+
+
 def unique_texts(values_to_check: list[str]) -> list[str]:
     return list(dict.fromkeys(value.strip() for value in values_to_check if value and value.strip()))
 
@@ -1017,11 +1060,24 @@ def build_invoice_from_payload(
         dimensions = normalize_thickness_in_measure(
             scalar_text(item.get("dimensions"))
         ) or combine_dimensions(thickness, width, length)
+        material = scalar_text(item.get("material"))
+        quality = scalar_text(item.get("quality"))
+        source_description = scalar_text(
+            item.get("sourceDescription") or item.get("description")
+        )
+        if not quality and "|" in source_description:
+            quality_text = source_description.split("|", 1)[0].strip()
+            quality = re.sub(
+                rf"^\s*{re.escape(material)}\s*",
+                "",
+                quality_text,
+                flags=re.IGNORECASE,
+            ).strip()
         lines.append(
             Line(
-                material=scalar_text(item.get("material")),
+                material=material,
                 dimensions=dimensions,
-                quality=scalar_text(item.get("quality")),
+                quality=quality,
                 factory_id=scalar_text(item.get("factoryId")),
                 packing=clean_packing_text(scalar_text(item.get("packing"))),
                 quantity=scalar_number(item.get("quantity")),
@@ -1633,21 +1689,64 @@ def table_layout(show_summary: bool, mode: str = "detail") -> dict[str, float]:
 
 
 def paginate_lines(lines: list[Line], mode: str) -> list[tuple[list[Line], bool]]:
-    final_capacity = int(table_layout(True, mode)["capacity"])
-    page_capacity = int(table_layout(False, mode)["capacity"])
-    if len(lines) <= final_capacity:
+    final_layout = table_layout(True, mode)
+    regular_layout = table_layout(False, mode)
+    desc_width = float(final_layout["desc_w"])
+    heights = [invoice_line_height(line, mode, desc_width) for line in lines]
+    final_budget = float(final_layout["line_area"])
+    regular_budget = float(regular_layout["line_area"])
+    total_height = sum(heights)
+    if total_height <= final_budget:
         return [(lines, True)]
 
+    def required_page_count(remaining_heights: list[float]) -> int:
+        end = len(remaining_heights)
+        page_budget = final_budget
+        page_count = 0
+        while end:
+            used_height = 0.0
+            start = end
+            while start and used_height + remaining_heights[start - 1] <= page_budget:
+                start -= 1
+                used_height += remaining_heights[start]
+            if start == end:
+                raise ValueError("Invoice row is taller than the available page area.")
+            page_count += 1
+            end = start
+            page_budget = regular_budget
+        return page_count
+
+    page_count = required_page_count(heights)
+
     pages: list[tuple[list[Line], bool]] = []
-    remaining = list(lines)
-    while len(remaining) > final_capacity:
-        if len(remaining) <= page_capacity + final_capacity:
-            take = len(remaining) - final_capacity
-        else:
-            take = page_capacity
-        pages.append((remaining[:take], False))
-        remaining = remaining[take:]
-    pages.append((remaining, True))
+    start = 0
+    remaining_height = total_height
+    final_summary_height = regular_budget - final_budget
+    for page_index in range(page_count - 1):
+        pages_left = page_count - page_index
+        target_take = (remaining_height + final_summary_height) / pages_left
+        candidates: list[tuple[int, float]] = []
+        taken_height = 0.0
+        take = 0
+        while start + take < len(lines):
+            next_height = heights[start + take]
+            if taken_height + next_height > regular_budget:
+                break
+            taken_height += next_height
+            take += 1
+            remaining_page_count = required_page_count(heights[start + take :])
+            if remaining_page_count <= pages_left - 1:
+                candidates.append((take, taken_height))
+        if not candidates:
+            raise ValueError("Could not paginate invoice rows within the available page areas.")
+        take, taken_height = min(
+            candidates,
+            key=lambda candidate: abs(candidate[1] - target_take),
+        )
+        pages.append((lines[start : start + take], False))
+        start += take
+        remaining_height -= taken_height
+    pages.append((lines[start:], True))
     return pages
 
 
@@ -1664,7 +1763,6 @@ def draw_table_page(c: canvas.Canvas, invoice: InvoiceData, page_lines: list[Lin
     header_h = layout["header_h"]
     category_h = layout["category_h"]
     summary_h = layout["summary_h"]
-    row_h = layout["row_h"]
 
     col_x = [x, x + desc_w, x + desc_w + qty_w, x + desc_w + qty_w + price_w, x + table_w]
     c.setLineWidth(0.8)
@@ -1697,8 +1795,10 @@ def draw_table_page(c: canvas.Canvas, invoice: InvoiceData, page_lines: list[Lin
     c.setFont(REGULAR_FONT, category_font_size)
     c.drawString(x + 2, y_top - header_h - 19, invoice.category)
 
-    y = y_top - header_h - category_h - row_h + 2
+    y_cursor = y_top - header_h - category_h
     for line in page_lines:
+        row_h = invoice_line_height(line, invoice.mode, desc_w)
+        y = y_cursor - row_h + 2
         c.setFont(REGULAR_FONT, line_font_size)
         if invoice.mode == "grouped":
             has_customer_codes = bool(clean_text(line.order_number) or clean_text(line.product_code))
@@ -1710,26 +1810,17 @@ def draw_table_page(c: canvas.Canvas, invoice: InvoiceData, page_lines: list[Lin
                 fit_text(c, grouped_description(line), desc_w - 10, MONO_FONT, grouped_font_size),
             )
         else:
-            main_desc, packing_desc = detail_description_parts(line)
+            description_lines = detail_description_lines(line, desc_w - 12)
             c.setFont(REGULAR_FONT, 5.8)
-            if packing_desc:
-                c.drawString(x + 5, y + 3.2, fit_text(c, main_desc, desc_w - 12, REGULAR_FONT, 5.8))
-                c.drawString(x + 5, y - 3.4, fit_text(c, packing_desc, desc_w - 12, REGULAR_FONT, 5.8))
+            if len(description_lines) == 1:
+                c.drawString(x + 5, y, description_lines[0])
             else:
-                draw_wrapped_left(
-                    c,
-                    main_desc,
-                    x + 5,
-                    y + 3,
-                    desc_w - 12,
-                    REGULAR_FONT,
-                    5.8,
-                    max_lines=2,
-                )
+                c.drawString(x + 5, y + 3.2, description_lines[0])
+                c.drawString(x + 5, y - 3.4, description_lines[1])
         draw_right_fit(c, fmt_decimal(line.quantity, 3, False), col_x[2] - 8, y, qty_w - 12, REGULAR_FONT, line_font_size)
         draw_right_fit(c, fmt_price(line.price, invoice.currency_symbol), col_x[3] - 8, y, price_w - 12, REGULAR_FONT, line_font_size)
         draw_right_fit(c, fmt_money(line.amount, invoice.currency_symbol), col_x[4] - 4, y, amount_w - 6, REGULAR_FONT, line_font_size)
-        y -= row_h
+        y_cursor -= row_h
 
     if not show_summary:
         return y_bottom
@@ -1752,7 +1843,7 @@ def draw_table_page(c: canvas.Canvas, invoice: InvoiceData, page_lines: list[Lin
             invoice.delivery_notes,
         ),
     ]
-    metadata_y = y - 8
+    metadata_y = y_cursor - 8
     for index, (label, values_list) in enumerate(metadata_rows):
         value = " / ".join(values_list) or "-"
         c.setFont(BOLD_FONT, 6.4)
