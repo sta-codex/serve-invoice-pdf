@@ -153,7 +153,7 @@ EXISTENCIA = {
     "espesor": "fldltcPdAI7UCKCIi",
     "ancho": "fldGKYFeLwtZB9nz9",
     "largo": "fldWjb44kCwH4TGxe",
-    "calidad": "fldNjXUAafi0fbOzj",
+    "calidad": "fldNjYqfJPmrYffUc",
     "recubrimiento": "fldU5cIV95gnhZV9D",
     "acabado": "flda4iwgVizHC4Y5t",
     "color": "fldTazhFY88OydGwE",
