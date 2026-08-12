@@ -246,7 +246,7 @@ function buildMerchandiseTableXml(confirmation, mode, options = {}) {
   const rows = [
     buildHeaderRow(mode, tableOptions),
     ...lines.map((line, index) => buildLineRow(line, index + 1, mode, tableOptions)),
-    ...buildSummaryRows(lines, subtotal, vat, total, tableWidths.length)
+    ...buildSummaryRows(lines, subtotal, vat, total, tableWidths.length, confirmation.totalQuantity)
   ];
 
   return [
@@ -354,12 +354,15 @@ function buildLineRow(
   ];
 }
 
-function buildSummaryRows(lines, subtotal, vat, total, columnCount) {
+function buildSummaryRows(lines, subtotal, vat, total, columnCount, totalQuantity) {
   const quantityColSpan = columnCount - 3;
   const vatColSpan = columnCount - 1;
   const totalLabelPrefixSpan = columnCount - 2;
+  const summaryQuantity = Number.isFinite(Number(totalQuantity))
+    ? Number(totalQuantity)
+    : sum(lines, "quantity");
   return [
-    [cell("", { span: quantityColSpan }), cell(formatNumber(sum(lines, "quantity"), 3), { align: "right", bold: true }), cell(""), cell(formatMoney(subtotal), { align: "right", bold: true })],
+    [cell("", { span: quantityColSpan }), cell(formatNumber(summaryQuantity, 3), { align: "right", bold: true }), cell(""), cell(formatMoney(subtotal), { align: "right", bold: true })],
     [cell("IVA 21%", { span: vatColSpan, align: "right", bold: true }), cell(formatMoney(vat), { align: "right", bold: true })],
     [cell("", { span: totalLabelPrefixSpan, shade: "EDEDED" }), cell("TOTAL", { align: "right", bold: true, shade: "EDEDED" }), cell(formatMoney(total), { align: "right", bold: true, shade: "EDEDED" })]
   ];

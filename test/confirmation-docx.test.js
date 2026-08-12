@@ -120,6 +120,41 @@ test("labels the final merchandise table row as total", async () => {
   assert.equal(lastRowCells.at(-1), "208.120,00");
 });
 
+test("uses confirmation total quantity in the merchandise summary row", async () => {
+  const buffer = await renderConfirmationDocx(
+    {
+      ...fakeConfirmation(),
+      totalQuantity: 199.858,
+      items: [
+        {
+          ...fakeConfirmation().items[0],
+          quantity: 99.93,
+          amount: 85939.8
+        },
+        {
+          ...fakeConfirmation().items[0],
+          number: 2,
+          quantity: 99.93,
+          amount: 85939.8
+        }
+      ]
+    },
+    { mode: "formato1" }
+  );
+  const zip = await JSZip.loadAsync(buffer);
+  const documentXml = await zip.file("word/document.xml").async("string");
+  const text = extractDocumentText(documentXml);
+  const table = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)]
+    .map((match) => match[0])
+    .find((candidate) => extractParagraphText(candidate).includes("TOTAL EUR"));
+  const rows = [...table.matchAll(/<w:tr>[\s\S]*?<\/w:tr>/g)].map((match) => match[0]);
+  const summaryRowCells = [...rows.at(-3).matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)]
+    .map((match) => extractParagraphText(match[0]));
+
+  assert.match(text, /CANTIDAD TOTAL: 199,858 MT/);
+  assert.equal(summaryRowCells.at(-3), "199,858");
+});
+
 test("shows total quantity tolerance only in grouped format", async () => {
   const groupedBuffer = await renderConfirmationDocx(fakeConfirmation(), {
     mode: "formato1"
